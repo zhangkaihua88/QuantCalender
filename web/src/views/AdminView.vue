@@ -23,7 +23,7 @@ const editorStatus = ref<'draft' | 'pending' | 'published' | 'rejected' | 'cance
 const reviewNotes = ref<Record<string, string>>({})
 
 const csvFile = ref<File | null>(null)
-const csvRows = ref<Array<{ wqId: string; country: 'CN' | 'HK'; recordDate: string }>>([])
+const csvRows = ref<Array<{ wqId: string; country: 'CN' | 'HK' }>>([])
 const csvInvalid = ref<string[]>([])
 const importProgress = ref('')
 
@@ -121,15 +121,16 @@ async function readCsv(file: File) {
   csvFile.value = file; csvRows.value = []; csvInvalid.value = []
   const lines = (await file.text()).replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim())
   const header = lines.shift()?.split(',').map((item) => item.trim().toLowerCase())
-  if (!header || header.join(',') !== 'wq_id,country,record_date') { csvInvalid.value.push('表头必须严格为 wq_id,country,record_date'); return }
+  if (!header || header.join(',') !== 'wq_id,country') { csvInvalid.value.push('表头必须严格为 wq_id,country'); return }
   const seen = new Set<string>()
   lines.forEach((line, index) => {
-    const [rawId = '', rawCountry = '', rawDate = ''] = line.split(',').map((item) => item?.trim() || '')
+    const cells = line.split(',').map((item) => item?.trim() || '')
+    const [rawId = '', rawCountry = ''] = cells
     const wqId = rawId.toUpperCase(); const country = rawCountry.toUpperCase()
-    if (!wqId || !['CN','HK'].includes(country) || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || seen.has(wqId)) {
+    if (cells.length !== 2 || !wqId || !['CN','HK'].includes(country) || seen.has(wqId)) {
       csvInvalid.value.push(`第 ${index + 2} 行无效或重复`); return
     }
-    seen.add(wqId); csvRows.value.push({ wqId, country: country as 'CN' | 'HK', recordDate: rawDate })
+    seen.add(wqId); csvRows.value.push({ wqId, country: country as 'CN' | 'HK' })
   })
 }
 
@@ -193,7 +194,7 @@ async function revokeAllAdminSessions() {
   </section>
 
   <section v-if="tab==='members'" class="panel-grid">
-    <div class="card card-body stack"><h2>整体替换成员名单</h2><div class="notice-box">CSV 表头必须为 <code>wq_id,country,record_date</code>。只接受 CN/HK，重复 ID 或非法行会阻止提交。</div><label class="button secondary" style="width:max-content"><FileUp :size="17" />选择 CSV<input type="file" accept=".csv,text/csv" hidden @change="onCsvChange" /></label><p v-if="csvFile">已选择：{{ csvFile.name }}</p><div v-if="csvRows.length" class="success-box">有效成员 {{ csvRows.length }} 名，其中 CN {{ csvRows.filter(r=>r.country==='CN').length }} 名、HK {{ csvRows.filter(r=>r.country==='HK').length }} 名。</div><div v-if="csvInvalid.length" class="error-box"><strong>发现 {{ csvInvalid.length }} 个问题</strong><ul><li v-for="item in csvInvalid.slice(0,10)" :key="item">{{ item }}</li></ul></div><p v-if="importProgress" class="muted">{{ importProgress }}</p><button class="button" :disabled="busy || !csvRows.length || !!csvInvalid.length" @click="importMembers">{{ busy ? '正在导入…' : '确认整体替换' }}</button></div>
+    <div class="card card-body stack"><h2>整体替换成员名单</h2><div class="notice-box">CSV 表头必须为 <code>wq_id,country</code>。只接受 CN/HK，重复 ID、额外列或非法行会阻止提交；导入日期由系统自动记录。</div><label class="button secondary" style="width:max-content"><FileUp :size="17" />选择 CSV<input type="file" accept=".csv,text/csv" hidden @change="onCsvChange" /></label><p v-if="csvFile">已选择：{{ csvFile.name }}</p><div v-if="csvRows.length" class="success-box">有效成员 {{ csvRows.length }} 名，其中 CN {{ csvRows.filter(r=>r.country==='CN').length }} 名、HK {{ csvRows.filter(r=>r.country==='HK').length }} 名。</div><div v-if="csvInvalid.length" class="error-box"><strong>发现 {{ csvInvalid.length }} 个问题</strong><ul><li v-for="item in csvInvalid.slice(0,10)" :key="item">{{ item }}</li></ul></div><p v-if="importProgress" class="muted">{{ importProgress }}</p><button class="button" :disabled="busy || !csvRows.length || !!csvInvalid.length" @click="importMembers">{{ busy ? '正在导入…' : '确认整体替换' }}</button></div>
     <aside class="card card-body"><h2>安全操作</h2><p class="fine-print">WQ_ID 会在服务端转换为带密钥 HMAC，原始 CSV 不会进入数据库或仓库。</p><div class="divider"></div><button class="button danger" @click="revokeAllAdminSessions"><ShieldX :size="17" />撤销全部管理员会话</button></aside>
   </section>
 

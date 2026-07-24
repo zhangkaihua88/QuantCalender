@@ -361,13 +361,14 @@ app.post('/v1/admin/member-imports/:id/rows', requireAuth('admin'), async (conte
   const importRow = await context.env.DB.prepare("SELECT id FROM member_imports WHERE id = ?1 AND status = 'staging'").bind(context.req.param('id')).first()
   if (!importRow) return apiError(context, 409, 'IMPORT_NOT_STAGING', '导入批次不可用')
   const statements: D1PreparedStatement[] = []
+  const recordDate = Temporal.Now.instant().toZonedDateTimeISO('Asia/Shanghai').toPlainDate().toString()
   for (const row of parsed.data.rows) {
     const normalized = normalizeWqId(row.wqId)
     statements.push(context.env.DB.prepare(`
       INSERT INTO member_import_rows (import_id, wq_id_hash, wq_id_hint, country, record_date)
       VALUES (?1, ?2, ?3, ?4, ?5)
       ON CONFLICT(import_id, wq_id_hash) DO UPDATE SET country = excluded.country, record_date = excluded.record_date
-    `).bind(context.req.param('id'), await hmacSha256(normalized, context.env.WQ_ID_HMAC_SECRET), wqIdHint(normalized), row.country, row.recordDate))
+    `).bind(context.req.param('id'), await hmacSha256(normalized, context.env.WQ_ID_HMAC_SECRET), wqIdHint(normalized), row.country, recordDate))
   }
   await context.env.DB.batch(statements)
   const count = await context.env.DB.prepare('SELECT COUNT(*) AS count FROM member_import_rows WHERE import_id = ?1').bind(context.req.param('id')).first<{ count: number }>()

@@ -58,8 +58,7 @@ export const adminLoginSchema = memberLoginSchema.extend({
 
 export const memberImportRowSchema = z.object({
   wqId: z.string().trim().min(2).max(64),
-  country: countrySchema,
-  recordDate: z.string().date()
+  country: countrySchema
 })
 
 export const importRowsSchema = z.object({

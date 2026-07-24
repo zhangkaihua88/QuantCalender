@@ -55,12 +55,12 @@ node worker/scripts/hash-admin-password.mjs
 管理员后台接受：
 
 ```csv
-wq_id,country,record_date
-EXAMPLE_001,CN,2026-07-23
-EXAMPLE_002,HK,2026-07-23
+wq_id,country
+EXAMPLE_001,CN
+EXAMPLE_002,HK
 ```
 
-导入采用“整体替换”：CSV 中缺失的旧成员会停用，其现有登录会话和私密日历订阅立即失效。导入前会检查表头、地区、日期和重复 ID。
+导入采用“整体替换”：CSV 中缺失的旧成员会停用，其现有登录会话和私密日历订阅立即失效。导入前会检查表头、地区和重复 ID；导入日期由服务端自动记录。
 
 ## 验证
 
