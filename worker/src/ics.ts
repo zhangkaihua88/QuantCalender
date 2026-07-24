@@ -39,7 +39,7 @@ function foldLine(line: string): string[] {
 function recurrenceRule(event: EventRow): string | null {
   const recurrence = JSON.parse(event.recurrence_json) as Recurrence
   if (recurrence.kind === 'none' || !recurrence.untilLocal) return null
-  const until = Temporal.PlainDateTime.from(recurrence.untilLocal).toZonedDateTime(event.source_timezone).toInstant().toString()
+  const until = Temporal.PlainDateTime.from(recurrence.untilLocal).toZonedDateTime('Asia/Shanghai').toInstant().toString()
   if (recurrence.kind === 'monthly') return `FREQ=MONTHLY;INTERVAL=1;UNTIL=${formatUtc(until)}`
   return `FREQ=WEEKLY;INTERVAL=${recurrence.kind === 'biweekly' ? 2 : 1};UNTIL=${formatUtc(until)}`
 }
@@ -51,18 +51,18 @@ function alarmLines(minutes: number): string[] {
 
 function baseEventLines(event: EventRow, alarmMinutes: number): string[] {
   const rule = recurrenceRule(event)
-  const description = [event.summary, event.description, `注册链接：${event.registration_url}`].filter(Boolean).join('\n\n')
+  const endLocal = Temporal.PlainDateTime.from(event.start_beijing).add({ minutes: event.duration_minutes }).toString()
+  const description = `注册链接：${event.registration_url}`
   const lines = [
     'BEGIN:VEVENT',
     `UID:${event.uid}`,
     `DTSTAMP:${formatUtc(new Date(event.updated_at).toISOString())}`,
     `LAST-MODIFIED:${formatUtc(new Date(event.updated_at).toISOString())}`,
     `SEQUENCE:${event.sequence}`,
-    `DTSTART;TZID=${event.source_timezone}:${formatLocal(event.start_local)}`,
-    `DTEND;TZID=${event.source_timezone}:${formatLocal(event.end_local)}`,
+    `DTSTART;TZID=Asia/Shanghai:${formatLocal(event.start_beijing)}`,
+    `DTEND;TZID=Asia/Shanghai:${formatLocal(endLocal)}`,
     `SUMMARY:${escapeText(event.title)}`,
     `DESCRIPTION:${escapeText(description)}`,
-    `LOCATION:${escapeText(event.location_text)}`,
     `URL:${event.registration_url}`,
     `STATUS:${event.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`,
     'TRANSP:OPAQUE'
@@ -74,23 +74,22 @@ function baseEventLines(event: EventRow, alarmMinutes: number): string[] {
 }
 
 function exceptionLines(event: EventRow, exception: ExceptionRow, alarmMinutes: number): string[] {
-  const original = Temporal.Instant.from(exception.occurrence_key).toZonedDateTimeISO(event.source_timezone).toPlainDateTime().toString()
+  const original = Temporal.Instant.from(exception.occurrence_key).toZonedDateTimeISO('Asia/Shanghai').toPlainDateTime().toString()
   const lines = [
     'BEGIN:VEVENT',
     `UID:${event.uid}`,
-    `RECURRENCE-ID;TZID=${event.source_timezone}:${formatLocal(original)}`,
+    `RECURRENCE-ID;TZID=Asia/Shanghai:${formatLocal(original)}`,
     `DTSTAMP:${formatUtc(new Date(event.updated_at).toISOString())}`,
     `SEQUENCE:${event.sequence}`,
     `SUMMARY:${escapeText(event.title)}`
   ]
   if (exception.action === 'cancel') {
-    lines.push(`DTSTART;TZID=${event.source_timezone}:${formatLocal(original)}`, 'STATUS:CANCELLED')
+    lines.push(`DTSTART;TZID=Asia/Shanghai:${formatLocal(original)}`, 'STATUS:CANCELLED')
   } else if (exception.override_start_local && exception.override_end_local && exception.override_timezone) {
     lines.push(
       `DTSTART;TZID=${exception.override_timezone}:${formatLocal(exception.override_start_local)}`,
       `DTEND;TZID=${exception.override_timezone}:${formatLocal(exception.override_end_local)}`,
-      `DESCRIPTION:${escapeText([event.summary, exception.note, `注册链接：${event.registration_url}`].filter(Boolean).join('\n\n'))}`,
-      `LOCATION:${escapeText(event.location_text)}`,
+      `DESCRIPTION:${escapeText([exception.note, `注册链接：${event.registration_url}`].filter(Boolean).join('\n\n'))}`,
       `URL:${event.registration_url}`,
       'STATUS:CONFIRMED',
       ...alarmLines(alarmMinutes)

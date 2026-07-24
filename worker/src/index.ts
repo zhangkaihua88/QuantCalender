@@ -64,16 +64,22 @@ function sessionUser(session: SessionRecord) {
   }
 }
 
+function validateMeetingTime(context: Parameters<typeof readJson>[0], input: MeetingInput): Response | null {
+  try {
+    normalizeMeetingTimes(input)
+    return null
+  } catch (error) {
+    const message = error instanceof Error && error.message === 'RECURRENCE_TOO_LONG' ? '重复会议最长只能设置 12 个月' : '会议时间无效'
+    return apiError(context, 422, 'INVALID_MEETING_TIME', message)
+  }
+}
+
 async function parseMeeting(context: Parameters<typeof readJson>[0]): Promise<MeetingInput | Response> {
   const data = await readJson(context)
   const parsed = meetingInputSchema.safeParse((data as { meeting?: unknown }).meeting ?? data)
   if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '请检查会议信息', parsed.error.flatten().fieldErrors as Record<string, string[]>)
-  try {
-    normalizeMeetingTimes(parsed.data)
-  } catch (error) {
-    const message = error instanceof Error && error.message === 'RECURRENCE_TOO_LONG' ? '重复会议最长只能设置 12 个月' : '会议时间或时区无效'
-    return apiError(context, 422, 'INVALID_MEETING_TIME', message)
-  }
+  const timeError = validateMeetingTime(context, parsed.data)
+  if (timeError) return timeError
   return parsed.data
 }
 
@@ -84,21 +90,16 @@ async function insertEvent(env: Env, input: MeetingInput, status: EventRow['stat
   const uid = `${id}@wq-meeting-calendar`
   await env.DB.prepare(`
     INSERT INTO events (
-      id, uid, status, submitter_member_id, title, summary, description, organizer, speaker,
-      category, meeting_language, location_type, location_text, registration_url,
-      registration_deadline_utc, source_timezone, start_local, end_local, start_utc, end_utc,
-      duration_minutes, recurrence_json, sequence, review_note, created_by, reviewed_by,
+      id, uid, status, submitter_member_id, title, category, meeting_language, registration_url,
+      start_beijing, duration_minutes, recurrence_json, sequence, review_note, created_by, reviewed_by,
       created_at, updated_at, published_at
     ) VALUES (
-      ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-      ?16, ?17, ?18, ?19, ?20, ?21, ?22, 0, '', ?23, NULL, ?24, ?24, ?25
+      ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, '', ?12, NULL, ?13, ?13, ?14
     )
   `).bind(
-    id, uid, status, submitterMemberId, input.title, input.summary, input.description,
-    input.organizer, input.speaker, input.category, input.meetingLanguage, input.locationType,
-    input.locationText, input.registrationUrl, input.registrationDeadlineUtc, input.sourceTimezone,
-    input.startLocal, input.endLocal, normalized.startUtc, normalized.endUtc, normalized.durationMinutes,
-    JSON.stringify(input.recurrence), creator, now, status === 'published' ? now : null
+    id, uid, status, submitterMemberId, input.title, input.category, input.meetingLanguage,
+    input.registrationUrl, input.startLocal, normalized.durationMinutes, JSON.stringify(input.recurrence),
+    creator, now, status === 'published' ? now : null
   ).run()
   return (await env.DB.prepare('SELECT * FROM events WHERE id = ?1').bind(id).first<EventRow>())!
 }
@@ -110,18 +111,14 @@ async function updateEvent(env: Env, id: string, input: MeetingInput, status?: E
   if (!current) return null
   const nextStatus = status || current.status
   await env.DB.prepare(`
-    UPDATE events SET status = ?2, title = ?3, summary = ?4, description = ?5, organizer = ?6,
-      speaker = ?7, category = ?8, meeting_language = ?9, location_type = ?10, location_text = ?11,
-      registration_url = ?12, registration_deadline_utc = ?13, source_timezone = ?14,
-      start_local = ?15, end_local = ?16, start_utc = ?17, end_utc = ?18, duration_minutes = ?19,
-      recurrence_json = ?20, sequence = sequence + 1, updated_at = ?21,
-      published_at = CASE WHEN ?2 = 'published' AND published_at IS NULL THEN ?21 ELSE published_at END
+    UPDATE events SET status = ?2, title = ?3, category = ?4, meeting_language = ?5,
+      registration_url = ?6, start_beijing = ?7, duration_minutes = ?8,
+      recurrence_json = ?9, sequence = sequence + 1, updated_at = ?10,
+      published_at = CASE WHEN ?2 = 'published' AND published_at IS NULL THEN ?10 ELSE published_at END
     WHERE id = ?1
   `).bind(
-    id, nextStatus, input.title, input.summary, input.description, input.organizer, input.speaker,
-    input.category, input.meetingLanguage, input.locationType, input.locationText, input.registrationUrl,
-    input.registrationDeadlineUtc, input.sourceTimezone, input.startLocal, input.endLocal,
-    normalized.startUtc, normalized.endUtc, normalized.durationMinutes, JSON.stringify(input.recurrence), now
+    id, nextStatus, input.title, input.category, input.meetingLanguage, input.registrationUrl,
+    input.startLocal, normalized.durationMinutes, JSON.stringify(input.recurrence), now
   ).run()
   return env.DB.prepare('SELECT * FROM events WHERE id = ?1').bind(id).first<EventRow>()
 }
@@ -271,9 +268,16 @@ app.post('/v1/admin/events', requireAuth('admin'), async (context) => {
   const raw = await readJson(context)
   const parsedMeeting = meetingInputSchema.safeParse((raw as { meeting?: unknown }).meeting ?? raw)
   if (!parsedMeeting.success) return apiError(context, 422, 'VALIDATION_ERROR', '请检查会议信息', parsedMeeting.error.flatten().fieldErrors as Record<string, string[]>)
+  const timeError = validateMeetingTime(context, parsedMeeting.data)
+  if (timeError) return timeError
   const status = (raw as { status?: string }).status === 'draft' ? 'draft' : 'published'
   let event: EventRow
-  try { event = await insertEvent(context.env, parsedMeeting.data, status, 'admin', null) } catch { return apiError(context, 422, 'INVALID_MEETING_TIME', '会议时间或时区无效') }
+  try {
+    event = await insertEvent(context.env, parsedMeeting.data, status, 'admin', null)
+  } catch (error) {
+    console.error('Failed to create event', error)
+    return apiError(context, 500, 'EVENT_SAVE_FAILED', '会议保存失败，请稍后重试')
+  }
   await audit(context.env, session, 'create', 'event', event.id, { status })
   return context.json({ meeting: publicEvent(event) }, 201)
 })
@@ -284,6 +288,8 @@ app.patch('/v1/admin/events/:id', requireAuth('admin'), async (context) => {
   const raw = await readJson(context)
   const parsedMeeting = meetingInputSchema.safeParse((raw as { meeting?: unknown }).meeting ?? raw)
   if (!parsedMeeting.success) return apiError(context, 422, 'VALIDATION_ERROR', '请检查会议信息', parsedMeeting.error.flatten().fieldErrors as Record<string, string[]>)
+  const timeError = validateMeetingTime(context, parsedMeeting.data)
+  if (timeError) return timeError
   const requestedStatus = (raw as { status?: EventRow['status'] }).status
   const current = await context.env.DB.prepare('SELECT status FROM events WHERE id = ?1').bind(context.req.param('id')).first<{ status: EventRow['status'] }>()
   if (!current) return apiError(context, 404, 'NOT_FOUND', '会议不存在')
@@ -292,7 +298,12 @@ app.patch('/v1/admin/events/:id', requireAuth('admin'), async (context) => {
     return apiError(context, 409, 'INVALID_STATE', '会议状态不能通过编辑操作直接变更')
   }
   let event: EventRow | null
-  try { event = await updateEvent(context.env, context.req.param('id'), parsedMeeting.data, requestedStatus) } catch { return apiError(context, 422, 'INVALID_MEETING_TIME', '会议时间或时区无效') }
+  try {
+    event = await updateEvent(context.env, context.req.param('id'), parsedMeeting.data, requestedStatus)
+  } catch (error) {
+    console.error('Failed to update event', error)
+    return apiError(context, 500, 'EVENT_SAVE_FAILED', '会议保存失败，请稍后重试')
+  }
   if (!event) return apiError(context, 404, 'NOT_FOUND', '会议不存在')
   await audit(context.env, session, 'update', 'event', event.id, { status: event.status })
   return context.json({ meeting: publicEvent(event) })

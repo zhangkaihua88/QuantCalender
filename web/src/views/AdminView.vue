@@ -56,23 +56,11 @@ async function loadAll() {
 
 function meetingFromEvent(item: any): Partial<MeetingInput> {
   return {
-    title: item.title, summary: item.summary, description: item.description, organizer: item.organizer,
-    speaker: item.speaker, category: item.category, meetingLanguage: item.meetingLanguage,
-    locationType: item.locationType, locationText: item.locationText, registrationUrl: item.registrationUrl,
-    registrationDeadlineUtc: utcToBeijingLocal(item.registrationDeadlineUtc), sourceTimezone: item.sourceTimezone,
-    startLocal: item.startLocal.slice(0, 16), endLocal: item.endLocal.slice(0, 16),
+    title: item.title, category: item.category, meetingLanguage: item.meetingLanguage,
+    registrationUrl: item.registrationUrl, startLocal: item.startLocal.slice(0, 16),
+    durationMinutes: item.durationMinutes,
     recurrence: { ...item.recurrence, untilLocal: item.recurrence?.untilLocal?.slice(0, 16) || null }
   }
-}
-
-function utcToBeijingLocal(value: string | null) {
-  if (!value) return null
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(new Date(value))
-  const part = (type: string) => parts.find((item) => item.type === type)?.value || ''
-  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
 }
 
 function createEvent() { editing.value = null; editorStatus.value = 'published'; editorOpen.value = true }

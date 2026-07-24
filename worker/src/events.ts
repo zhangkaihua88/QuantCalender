@@ -7,21 +7,10 @@ export interface EventRow {
   status: 'draft' | 'pending' | 'published' | 'rejected' | 'cancelled'
   submitter_member_id: string | null
   title: string
-  summary: string
-  description: string
-  organizer: string
-  speaker: string
   category: string
   meeting_language: 'zh' | 'en' | 'bilingual' | 'other'
-  location_type: 'online' | 'offline' | 'hybrid'
-  location_text: string
   registration_url: string
-  registration_deadline_utc: string | null
-  source_timezone: string
-  start_local: string
-  end_local: string
-  start_utc: string
-  end_utc: string
+  start_beijing: string
   duration_minutes: number
   recurrence_json: string
   sequence: number
@@ -46,10 +35,9 @@ export interface ExceptionRow {
 
 export function normalizeMeetingTimes(input: MeetingInput) {
   const startPlain = Temporal.PlainDateTime.from(input.startLocal)
-  const endPlain = Temporal.PlainDateTime.from(input.endLocal)
-  const startZoned = startPlain.toZonedDateTime(input.sourceTimezone)
-  const endZoned = endPlain.toZonedDateTime(input.sourceTimezone)
-  if (Temporal.ZonedDateTime.compare(endZoned, startZoned) <= 0) throw new Error('INVALID_TIME_RANGE')
+  const endPlain = startPlain.add({ minutes: input.durationMinutes })
+  const startZoned = startPlain.toZonedDateTime('Asia/Shanghai')
+  const endZoned = endPlain.toZonedDateTime('Asia/Shanghai')
   if (input.recurrence.untilLocal) {
     const until = Temporal.PlainDateTime.from(input.recurrence.untilLocal)
     const maximum = startPlain.add({ months: 12 })
@@ -73,7 +61,7 @@ export function expandEvent(event: EventRow, exceptions: ExceptionRow[], from: s
   const rangeStart = Temporal.Instant.from(from)
   const rangeEnd = Temporal.Instant.from(to)
   const recurrence = JSON.parse(event.recurrence_json) as Recurrence
-  const original = Temporal.PlainDateTime.from(event.start_local)
+  const original = Temporal.PlainDateTime.from(event.start_beijing)
   const until = recurrence.untilLocal ? Temporal.PlainDateTime.from(recurrence.untilLocal) : original
   const exceptionMap = new Map(exceptions.map((item) => [item.occurrence_key, item]))
   const localStarts: Temporal.PlainDateTime[] = []
@@ -98,7 +86,7 @@ export function expandEvent(event: EventRow, exceptions: ExceptionRow[], from: s
 
   const result: MeetingOccurrence[] = []
   for (const localStart of localStarts.slice(0, 80)) {
-    const zoned = localStart.toZonedDateTime(event.source_timezone)
+    const zoned = localStart.toZonedDateTime('Asia/Shanghai')
     const key = zoned.toInstant().toString()
     const exception = exceptionMap.get(key)
     let startInstant = zoned.toInstant()
@@ -114,15 +102,15 @@ export function expandEvent(event: EventRow, exceptions: ExceptionRow[], from: s
       eventId: event.id,
       occurrenceKey: key,
       title: event.title,
-      summary: event.summary,
-      organizer: event.organizer,
-      speaker: event.speaker,
+      summary: event.title,
+      organizer: 'WQ',
+      speaker: '',
       category: event.category,
       meetingLanguage: event.meeting_language,
-      locationType: event.location_type,
-      locationText: event.location_text,
+      locationType: 'online',
+      locationText: '线上会议',
       registrationUrl: event.registration_url,
-      sourceTimezone: exception?.override_timezone || event.source_timezone,
+      sourceTimezone: exception?.override_timezone || 'Asia/Shanghai',
       startUtc: startInstant.toString(),
       endUtc: endInstant.toString(),
       status,
@@ -133,26 +121,37 @@ export function expandEvent(event: EventRow, exceptions: ExceptionRow[], from: s
 }
 
 export function publicEvent(event: EventRow) {
+  const normalized = normalizeMeetingTimes({
+    title: event.title,
+    category: event.category,
+    meetingLanguage: event.meeting_language,
+    registrationUrl: event.registration_url,
+    startLocal: event.start_beijing,
+    durationMinutes: event.duration_minutes as MeetingInput['durationMinutes'],
+    recurrence: JSON.parse(event.recurrence_json) as Recurrence
+  })
+  const endLocal = Temporal.PlainDateTime.from(event.start_beijing).add({ minutes: event.duration_minutes }).toString()
   return {
     id: event.id,
     uid: event.uid,
     status: event.status,
     title: event.title,
-    summary: event.summary,
-    description: event.description,
-    organizer: event.organizer,
-    speaker: event.speaker,
+    summary: event.title,
+    description: '',
+    organizer: 'WQ',
+    speaker: '',
     category: event.category,
     meetingLanguage: event.meeting_language,
-    locationType: event.location_type,
-    locationText: event.location_text,
+    locationType: 'online',
+    locationText: '线上会议',
     registrationUrl: event.registration_url,
-    registrationDeadlineUtc: event.registration_deadline_utc,
-    sourceTimezone: event.source_timezone,
-    startLocal: event.start_local,
-    endLocal: event.end_local,
-    startUtc: event.start_utc,
-    endUtc: event.end_utc,
+    registrationDeadlineUtc: null,
+    sourceTimezone: 'Asia/Shanghai',
+    startLocal: event.start_beijing,
+    endLocal,
+    startUtc: normalized.startUtc,
+    endUtc: normalized.endUtc,
+    durationMinutes: event.duration_minutes,
     recurrence: JSON.parse(event.recurrence_json) as Recurrence,
     sequence: event.sequence,
     reviewNote: event.review_note,

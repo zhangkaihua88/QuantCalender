@@ -3,7 +3,7 @@ import { computed, reactive, watch } from 'vue'
 import type { MeetingInput } from '@wq-calendar/shared'
 
 type RecurrenceValue = { kind: 'none' | 'weekly' | 'biweekly' | 'monthly'; untilLocal: string | null }
-type FormValue = MeetingInput & { durationMinutes: number; recurrence: RecurrenceValue }
+type FormValue = Omit<MeetingInput, 'durationMinutes' | 'recurrence'> & { durationMinutes: 30 | 60 | 90 | 120 | 180; recurrence: RecurrenceValue }
 
 const props = withDefaults(defineProps<{
   initial?: Partial<MeetingInput>
@@ -22,10 +22,8 @@ function localDefault(hoursAhead = 24) {
 
 function defaults(): FormValue {
   return {
-    title: '', summary: '', description: '', organizer: 'WQ', speaker: '', category: '培训',
-    meetingLanguage: 'zh', locationType: 'online', locationText: '线上会议', registrationUrl: '',
-    registrationDeadlineUtc: null, sourceTimezone: 'Asia/Shanghai', startLocal: localDefault(24),
-    endLocal: localDefault(25), durationMinutes: 60, recurrence: { kind: 'none', untilLocal: null }
+    title: '', category: '培训', meetingLanguage: 'zh', registrationUrl: '',
+    startLocal: localDefault(24), durationMinutes: 60, recurrence: { kind: 'none', untilLocal: null }
   }
 }
 
@@ -34,18 +32,12 @@ function withSeconds(value: string | null) {
   return value.length === 16 ? `${value}:00` : value
 }
 
-function durationBetween(start?: string, end?: string) {
-  if (!start || !end) return 60
-  const minutes = Math.round((Date.parse(`${withSeconds(end)}Z`) - Date.parse(`${withSeconds(start)}Z`)) / 60000)
-  return minutes > 0 ? minutes : 60
-}
-
 function formValue(initial?: Partial<MeetingInput>): FormValue {
   const base = defaults()
   return {
     ...base,
     ...initial,
-    durationMinutes: durationBetween(initial?.startLocal, initial?.endLocal),
+    durationMinutes: initial?.durationMinutes || 60,
     recurrence: { ...base.recurrence, ...initial?.recurrence }
   }
 }
@@ -57,28 +49,16 @@ watch(() => props.initial, (value) => {
   Object.assign(form, formValue(value))
 }, { deep: true })
 
-function addMinutes(value: string, minutes: number) {
-  const date = new Date(`${withSeconds(value)}Z`)
-  date.setUTCMinutes(date.getUTCMinutes() + minutes)
-  return date.toISOString().slice(0, 19)
-}
-
 function submit() {
-  const { durationMinutes, ...meeting } = form
-  const startLocal = withSeconds(meeting.startLocal)!
+  const startLocal = withSeconds(form.startLocal)!
   emit('submit', {
-    ...meeting,
-    summary: meeting.summary.trim() || meeting.title.trim(),
-    description: meeting.description || '',
-    organizer: meeting.organizer.trim() || 'WQ',
-    speaker: meeting.speaker || '',
-    locationType: 'online',
-    locationText: '线上会议',
-    registrationDeadlineUtc: null,
-    sourceTimezone: 'Asia/Shanghai',
+    title: form.title,
+    category: form.category,
+    meetingLanguage: form.meetingLanguage,
+    registrationUrl: form.registrationUrl,
     startLocal,
-    endLocal: addMinutes(startLocal, durationMinutes),
-    recurrence: { ...meeting.recurrence, untilLocal: showUntil.value ? withSeconds(meeting.recurrence.untilLocal) : null }
+    durationMinutes: form.durationMinutes,
+    recurrence: { ...form.recurrence, untilLocal: showUntil.value ? withSeconds(form.recurrence.untilLocal) : null }
   })
 }
 </script>

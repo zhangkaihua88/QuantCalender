@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CalendarCheck2, Clock3, ShieldCheck } from 'lucide-vue-next'
 import { login, ApiError } from '../api'
 import { setUser } from '../state'
 import type { SessionUser } from '@wq-calendar/shared'
@@ -68,19 +67,13 @@ async function submit() {
       <div class="login-hero">
         <p class="eyebrow" style="color:#a7d9d3">BEIJING TIME · MEMBER ONLY</p>
         <h1>不错过每一场<br />重要会议。</h1>
-        <p>把中国大陆与香港成员的会议集中在一处。查看议程、提交会议，并订阅到自己的日历中持续获得提醒。</p>
-      </div>
-      <div class="login-features">
-        <div class="login-feature"><CalendarCheck2 :size="22" /><strong>统一日历</strong><span>审批通过后立即可见</span></div>
-        <div class="login-feature"><Clock3 :size="22" /><strong>北京时间</strong><span>跨时区自动换算</span></div>
-        <div class="login-feature"><ShieldCheck :size="22" /><strong>成员访问</strong><span>仅导入名单内可登录</span></div>
       </div>
     </section>
     <section class="login-form-area">
       <div class="login-card card">
         <p class="eyebrow">SECURE ACCESS</p>
         <h2>{{ mode === 'member' ? '成员登录' : '管理员登录' }}</h2>
-        <p class="subtitle">登录状态保持 30 天。WQ_ID 仅作为成员名单门禁，不代表官方身份认证。</p>
+        <p class="subtitle">登录状态保持 30 天。</p>
         <div class="login-switch">
           <button type="button" :class="{ active: mode === 'member' }" @click="mode = 'member'">普通成员</button>
           <button type="button" :class="{ active: mode === 'admin' }" @click="mode = 'admin'">管理员</button>

@@ -153,10 +153,6 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .login-hero { max-width: 650px; position: relative; z-index: 1; }
 .login-hero h1 { font-size: clamp(45px, 7vw, 78px); }
 .login-hero p { max-width: 560px; color: #cfe1e1; font-size: 17px; line-height: 1.8; }
-.login-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; position: relative; z-index: 1; }
-.login-feature { padding: 17px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.07); backdrop-filter: blur(8px); }
-.login-feature strong, .login-feature span { display: block; }
-.login-feature span { margin-top: 5px; color: #b8d2d1; font-size: 12px; }
 .login-form-area { display: grid; place-items: center; padding: 30px; background: var(--bg); }
 .login-card { width: min(440px, 100%); padding: clamp(25px, 5vw, 42px); }
 .login-card h2 { font-size: 30px; }
@@ -196,7 +192,6 @@ h3 { margin-bottom: 8px; font-size: 17px; }
   .calendar-chip { padding: 4px; font-size: 9px; }
   .site-footer { flex-direction: column; }
   .login-story { padding: 28px 22px; }
-  .login-features { grid-template-columns: 1fr; }
   .login-form-area { padding: 22px 14px; }
   .data-table { display: block; overflow-x: auto; }
 }

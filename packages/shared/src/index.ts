@@ -24,24 +24,13 @@ const safeHttpsUrl = z.string().url().max(2048).refine((value) => {
 
 export const meetingInputSchema = z.object({
   title: z.string().trim().min(2).max(120),
-  summary: z.string().trim().min(2).max(240),
-  description: z.string().trim().max(4000).default(''),
-  organizer: z.string().trim().min(1).max(120),
-  speaker: z.string().trim().max(120).default(''),
   category: z.string().trim().min(1).max(48),
   meetingLanguage: z.enum(['zh', 'en', 'bilingual', 'other']).default('zh'),
-  locationType: z.enum(['online', 'offline', 'hybrid']).default('online'),
-  locationText: z.string().trim().min(1).max(160),
   registrationUrl: safeHttpsUrl,
-  registrationDeadlineUtc: z.string().datetime().nullable().default(null),
-  sourceTimezone: z.string().trim().min(1).max(80).default('Asia/Shanghai'),
   startLocal: z.string().datetime({ local: true }),
-  endLocal: z.string().datetime({ local: true }),
+  durationMinutes: z.union([z.literal(30), z.literal(60), z.literal(90), z.literal(120), z.literal(180)]).default(60),
   recurrence: recurrenceSchema.default({ kind: 'none', untilLocal: null })
 }).superRefine((value, context) => {
-  if (value.endLocal <= value.startLocal) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['endLocal'], message: '结束时间必须晚于开始时间' })
-  }
   if (value.recurrence.untilLocal && value.recurrence.untilLocal <= value.startLocal) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['recurrence', 'untilLocal'], message: '重复结束时间必须晚于首次会议' })
   }

@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { meetingInputSchema } from '@wq-calendar/shared'
 import MeetingForm from '../src/components/MeetingForm.vue'
 
 describe('MeetingForm', () => {
@@ -18,16 +19,15 @@ describe('MeetingForm', () => {
   it('defaults to a one-hour meeting and fills internal fields', async () => {
     const wrapper = mount(MeetingForm)
     await wrapper.find('#meeting-title').setValue('顾问周会')
+    await wrapper.find('#registration-url').setValue('https://example.com/register')
     await wrapper.find('#start').setValue('2026-08-01T18:30')
     await wrapper.find('form').trigger('submit')
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+    const payload = wrapper.emitted('submit')?.[0]?.[0]
+    expect(payload).toMatchObject({
       title: '顾问周会',
-      summary: '顾问周会',
-      organizer: 'WQ',
-      sourceTimezone: 'Asia/Shanghai',
       startLocal: '2026-08-01T18:30:00',
-      endLocal: '2026-08-01T19:30:00',
-      registrationDeadlineUtc: null
+      durationMinutes: 60
     })
+    expect(meetingInputSchema.safeParse(payload).success).toBe(true)
   })
 })
