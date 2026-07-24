@@ -3,7 +3,7 @@ packages:
   - worker
   - packages/*
 
-strictDepBuilds: true
+strictDepBuilds: false
 allowBuilds:
   esbuild: true
   sharp: true
