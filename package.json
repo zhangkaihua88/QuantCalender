@@ -2,7 +2,7 @@
   "name": "wq-meeting-calendar",
   "private": true,
   "version": "1.0.0",
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "pnpm --filter @wq-calendar/web dev",
     "dev:worker": "pnpm --filter @wq-calendar/worker dev",
