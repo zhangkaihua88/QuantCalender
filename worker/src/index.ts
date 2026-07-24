@@ -226,13 +226,87 @@ app.get('/v1/meetings/:id', requireAuth(), async (context) => {
   if (!event) return apiError(context, 404, 'NOT_FOUND', '会议不存在')
   const exceptions = await listEventExceptions(context.env, [event.id])
   if (wantsIcs) {
-    const alarm = Number(context.req.query('alarm') || 30)
-    const safeAlarm = [10, 30, 60, 1440].includes(alarm) ? alarm : 30
+    const alarmParam = context.req.query('alarm')
+    const alarm = alarmParam === undefined ? 30 : Number(alarmParam)
+    const safeAlarm = [0, 10, 30, 60, 1440].includes(alarm) ? alarm : 30
     context.header('Content-Type', 'text/calendar; charset=utf-8')
     context.header('Content-Disposition', `attachment; filename="wq-meeting-${event.id}.ics"`)
     return context.body(buildCalendarIcs([event], exceptions, safeAlarm))
   }
   return context.json({ meeting: publicEvent(event), exceptions })
+})
+
+app.get('/v1/leaderboard', requireAuth(), async (context) => {
+  type LeaderboardRow = {
+    member_id: string
+    wq_id_hint: string
+    wq_id_ciphertext: string | null
+    country: 'CN' | 'HK'
+    submission_count: number
+    approved_count: number
+  }
+  type LeaderboardSummary = { contributor_count: number; submission_count: number; approved_count: number }
+  const requestedPage = Number(context.req.query('page') || 1)
+  const requestedPageSize = Number(context.req.query('pageSize') || 50)
+  const pageSize = [25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
+  const adminWqHash = await hmacSha256(normalizeWqId(context.env.ADMIN_WQ_ID), context.env.WQ_ID_HMAC_SECRET)
+  const summary = await context.env.DB.prepare(`
+    SELECT COUNT(DISTINCT e.submitter_member_id) AS contributor_count,
+      COUNT(*) AS submission_count,
+      COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+    FROM events e
+    JOIN members m ON m.id = e.submitter_member_id
+    WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+  `).bind(adminWqHash).first<LeaderboardSummary>()
+  const total = summary?.contributor_count || 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, Number.isFinite(requestedPage) ? Math.trunc(requestedPage) : 1), totalPages)
+  const offset = (page - 1) * pageSize
+  const result = await context.env.DB.prepare(`
+    SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.country,
+      COUNT(e.id) AS submission_count,
+      COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+    FROM events e
+    JOIN members m ON m.id = e.submitter_member_id
+    WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+    GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.country
+    ORDER BY approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
+    LIMIT ?2 OFFSET ?3
+  `).bind(adminWqHash, pageSize, offset).all<LeaderboardRow>()
+  const session = context.get('session')
+  const entries = await Promise.all(result.results.map(async (row, index) => {
+    let wqId = row.wq_id_hint
+    let hasFullWqId = false
+    if (session.role === 'admin' && row.wq_id_ciphertext) {
+      try {
+        wqId = await decryptWqId(row.wq_id_ciphertext, context.env.WQ_ID_HMAC_SECRET)
+        hasFullWqId = true
+      } catch { /* Keep the non-sensitive hint when ciphertext cannot be decrypted. */ }
+    }
+    return {
+      rank: offset + index + 1,
+      memberId: row.member_id,
+      wqId,
+      hasFullWqId,
+      country: row.country,
+      submissionCount: row.submission_count,
+      approvedCount: row.approved_count,
+      approvalRate: row.submission_count ? Math.round(row.approved_count / row.submission_count * 1000) / 10 : 0,
+      isCurrentUser: session.role === 'member' && session.member_id === row.member_id
+    }
+  }))
+  const submissionCount = summary?.submission_count || 0
+  const approvedCount = summary?.approved_count || 0
+  return context.json({
+    summary: {
+      contributorCount: total,
+      submissionCount,
+      approvedCount,
+      approvalRate: submissionCount ? Math.round(approvedCount / submissionCount * 1000) / 10 : 0
+    },
+    pagination: { page, pageSize, total, totalPages },
+    entries
+  })
 })
 
 app.post('/v1/submissions', requireAuth('member'), async (context) => {

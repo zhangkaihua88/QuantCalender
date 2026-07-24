@@ -8,6 +8,7 @@ import MySubmissionsView from './views/MySubmissionsView.vue'
 import CalendarSettingsView from './views/CalendarSettingsView.vue'
 import AdminView from './views/AdminView.vue'
 import AboutView from './views/AboutView.vue'
+import LeaderboardView from './views/LeaderboardView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -18,8 +19,10 @@ const router = createRouter({
     { path: '/submit', component: SubmitView, meta: { member: true } },
     { path: '/submissions', component: MySubmissionsView, meta: { member: true } },
     { path: '/calendar-settings', component: CalendarSettingsView, meta: { member: true } },
+    { path: '/leaderboard', component: LeaderboardView },
     { path: '/admin', component: AdminView, meta: { admin: true } },
-    { path: '/about', component: AboutView },
+    { path: '/guide', component: AboutView },
+    { path: '/about', redirect: '/guide' },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

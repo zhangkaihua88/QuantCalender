@@ -11,7 +11,7 @@ const copied = ref(false)
 const busy = ref(false)
 
 onMounted(async () => {
-  try { const data = await api<{ feed: any }>('/v1/calendar-feed'); exists.value = data.feed.exists; alarmMinutes.value = data.feed.alarm_minutes || 30 }
+  try { const data = await api<{ feed: any }>('/v1/calendar-feed'); exists.value = data.feed.exists; alarmMinutes.value = data.feed.alarm_minutes ?? 30 }
   catch (caught) { error.value = caught instanceof ApiError ? caught.message : '加载订阅设置失败' }
 })
 
@@ -32,7 +32,7 @@ async function revoke() { if (!confirm('撤销后，旧订阅地址将立即失�
     <section class="card card-body stack">
       <div v-if="error" class="error-box">{{ error }}</div>
       <div class="notice-box">订阅刷新频率由日历客户端决定，可能不是即时。网站会保持会议 UID 稳定，并同步改期、取消和重复会议例外。</div>
-      <div class="field"><label for="default-alarm">默认提前提醒</label><select id="default-alarm" v-model="alarmMinutes" @change="updateAlarm"><option :value="10">10 分钟</option><option :value="30">30 分钟</option><option :value="60">1 小时</option><option :value="1440">1 天</option></select></div>
+      <div class="field"><label for="default-alarm">默认提前提醒</label><select id="default-alarm" v-model="alarmMinutes" @change="updateAlarm"><option :value="0">不提醒</option><option :value="10">10 分钟</option><option :value="30">30 分钟</option><option :value="60">1 小时</option><option :value="1440">1 天</option></select></div>
       <div v-if="feedUrl" class="field"><label for="feed-url">新订阅地址（仅显示这一次）</label><input id="feed-url" :value="feedUrl" readonly /><button class="button secondary" @click="copy"><Check v-if="copied" :size="17" /><Copy v-else :size="17" />{{ copied ? '已复制' : '复制地址' }}</button></div>
       <div class="inline">
         <button class="button" :disabled="busy" @click="generate"><RefreshCw :size="17" />{{ exists ? '旋转并生成新地址' : '生成订阅地址' }}</button>

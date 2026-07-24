@@ -141,7 +141,7 @@ function detailLink(item: MeetingOccurrence) {
         <div class="month-grid">
           <div v-for="day in monthDays" :key="day.key" class="month-day" :class="{ outside: !day.current }">
             <span class="day-number" :class="{ today: day.key === dayKey(new Date()) }">{{ day.date.getDate() }}</span>
-            <RouterLink v-for="item in day.events.slice(0,3)" :key="item.occurrenceKey" :to="detailLink(item)" class="calendar-chip">{{ timeFormatter.format(new Date(item.startUtc)) }} {{ item.title }}</RouterLink>
+            <RouterLink v-for="item in day.events.slice(0,3)" :key="item.occurrenceKey" :to="detailLink(item)" class="calendar-chip" :title="`${timeFormatter.format(new Date(item.startUtc))} ${item.title}`">{{ timeFormatter.format(new Date(item.startUtc)) }} {{ item.title }}</RouterLink>
           </div>
         </div>
       </div>

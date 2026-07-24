@@ -45,6 +45,7 @@ function recurrenceRule(event: EventRow): string | null {
 }
 
 function alarmLines(minutes: number): string[] {
+  if (minutes <= 0) return []
   const trigger = minutes === 1440 ? '-P1D' : `-PT${minutes}M`
   return ['BEGIN:VALARM', `TRIGGER:${trigger}`, 'ACTION:DISPLAY', 'DESCRIPTION:WQ Meeting Calendar 会议提醒', 'END:VALARM']
 }

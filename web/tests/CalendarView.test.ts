@@ -75,4 +75,27 @@ describe('CalendarView', () => {
     expect(agendaItem.text()).toContain('立即注册')
     expect(agendaItem.find('a[href="https://example.com/research"]').exists()).toBe(true)
   })
+
+  it('keeps long month titles inside an equal-width calendar cell', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2099-08-24T00:00:00Z'))
+    const longTitle = 'Path to Genius: 3 Part Consultant toolkit and exclusive competition for IQC consultants'
+    vi.mocked(api).mockResolvedValueOnce({ occurrences: [{
+      eventId: 'long-meeting', occurrenceKey: '2099-08-24T12:00:00Z', title: longTitle,
+      summary: longTitle, organizer: 'WQ', speaker: '', category: '培训', meetingLanguage: 'en',
+      locationType: 'online', locationText: '线上会议', registrationUrl: 'https://example.com/long',
+      sourceTimezone: 'Asia/Shanghai', startUtc: '2099-08-24T12:00:00Z', endUtc: '2099-08-24T13:00:00Z',
+      status: 'published', isException: false
+    }] })
+    try {
+      const wrapper = mount(CalendarView, {
+        global: { stubs: { RouterLink: { props: ['to'], template: '<a class="router-link"><slot /></a>' } } }
+      })
+      await flushPromises()
+      await wrapper.findAll('.segmented button')[1]!.trigger('click')
+      const chip = wrapper.find('.calendar-chip')
+      expect(chip.exists()).toBe(true)
+      expect(chip.attributes('title')).toContain(longTitle)
+    } finally { vi.useRealTimers() }
+  })
 })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { calendarFeedSchema } from '@wq-calendar/shared'
 import { buildCalendarIcs } from '../src/ics'
 import type { EventRow } from '../src/events'
 
@@ -21,5 +22,18 @@ describe('buildCalendarIcs', () => {
     expect(output).toContain('注册链接：https://example.com/register')
     expect(output).toContain('LAST-MODIFIED:')
     expect(output.endsWith('\r\n')).toBe(true)
+  })
+
+  it('omits calendar alarms when reminders are disabled', () => {
+    const output = buildCalendarIcs([event], [], 0)
+    expect(output).not.toContain('BEGIN:VALARM')
+    expect(output).not.toContain('TRIGGER:')
+  })
+})
+
+describe('calendar feed reminder validation', () => {
+  it('accepts no reminder and rejects unsupported values', () => {
+    expect(calendarFeedSchema.parse({ alarmMinutes: 0 }).alarmMinutes).toBe(0)
+    expect(calendarFeedSchema.safeParse({ alarmMinutes: 5 }).success).toBe(false)
   })
 })

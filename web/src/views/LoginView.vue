@@ -61,7 +61,7 @@ async function submit() {
   <div class="login-page">
     <section class="login-story">
       <div class="brand">
-        <span class="brand-mark">WQ</span>
+        <img class="brand-mark" src="/calendar-logo.png" alt="" width="44" height="44" />
         <span><strong>Meeting Calendar</strong><small>非官方成员工具</small></span>
       </div>
       <div class="login-hero">

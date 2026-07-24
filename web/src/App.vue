@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarDays, CircleHelp, ClipboardPlus, Github, LogOut, Settings, ShieldCheck } from 'lucide-vue-next'
+import { CalendarDays, CircleHelp, ClipboardPlus, Github, LogOut, Settings, ShieldCheck, Trophy } from 'lucide-vue-next'
 import { logout, session } from './state'
 
 const route = useRoute()
@@ -18,7 +18,7 @@ async function signOut() {
   <div class="site-shell" :class="{ 'login-shell': isLogin }">
     <header v-if="!isLogin" class="topbar">
       <RouterLink to="/" class="brand" aria-label="返回会议日历首页">
-        <span class="brand-mark">WQ</span>
+        <img class="brand-mark" src="/calendar-logo.png" alt="" width="44" height="44" />
         <span>
           <strong>Meeting Calendar</strong>
           <small>非官方成员工具</small>
@@ -28,8 +28,9 @@ async function signOut() {
         <RouterLink to="/"><CalendarDays :size="18" />日历</RouterLink>
         <RouterLink v-if="session.user?.role === 'member'" to="/submit"><ClipboardPlus :size="18" />投稿</RouterLink>
         <RouterLink v-if="session.user?.role === 'member'" to="/calendar-settings"><Settings :size="18" />提醒</RouterLink>
+        <RouterLink to="/leaderboard"><Trophy :size="18" />排行</RouterLink>
         <RouterLink v-if="session.user?.role === 'admin'" to="/admin"><ShieldCheck :size="18" />管理</RouterLink>
-        <RouterLink to="/about"><CircleHelp :size="18" />说明</RouterLink>
+        <RouterLink to="/guide"><CircleHelp :size="18" />指南</RouterLink>
       </nav>
       <div class="user-actions">
         <a class="github-link" href="https://github.com/zhangkaihua88/QuantCalender" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 QuantCalender 项目">

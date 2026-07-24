@@ -73,7 +73,7 @@ export const exceptionSchema = z.object({
 })
 
 export const calendarFeedSchema = z.object({
-  alarmMinutes: z.union([z.literal(10), z.literal(30), z.literal(60), z.literal(1440)]).default(30)
+  alarmMinutes: z.union([z.literal(0), z.literal(10), z.literal(30), z.literal(60), z.literal(1440)]).default(30)
 })
 
 export type MeetingInput = z.infer<typeof meetingInputSchema>
@@ -98,6 +98,18 @@ export interface MeetingOccurrence {
   endUtc: string
   status: 'published' | 'cancelled'
   isException: boolean
+}
+
+export interface LeaderboardEntry {
+  rank: number
+  memberId: string
+  wqId: string
+  hasFullWqId: boolean
+  country: 'CN' | 'HK'
+  submissionCount: number
+  approvedCount: number
+  approvalRate: number
+  isCurrentUser: boolean
 }
 
 export interface SessionUser {

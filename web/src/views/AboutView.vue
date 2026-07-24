@@ -1,7 +1,39 @@
 <template>
-  <div class="page-head"><div><p class="eyebrow">ABOUT & PRIVACY</p><h1>关于这个日历</h1><p class="subtitle">WQ Meeting Calendar 是独立制作的非官方成员工具，帮助中国大陆与香港成员集中管理会议安排。</p></div></div>
+  <div class="page-head"><div><p class="eyebrow">MEMBER GUIDE</p><h1>成员使用指南</h1><p class="subtitle">从查找会议、完成注册到投稿和设置提醒，按照下面的步骤即可开始使用。</p></div></div>
   <div class="panel-grid">
-    <section class="card card-body detail-copy"><h2>使用边界</h2><p>本网站不代表 WorldQuant 官方立场，也不使用官方 Logo。请只提交可以在成员范围内传播的注册页链接，不要保存会议密码、个人专属直达链接、参与者名单或内部文件。</p><h2>身份说明</h2><p>WQ_ID 登录仅检查管理员导入的成员名单，并不能证明当前使用者确实拥有该 ID。若后续需要更高保密等级，应升级为邮箱验证码或其他双重身份验证。</p><h2>提醒说明</h2><p>网站提供标准 iCalendar 订阅与单场下载。提醒是否触发、订阅多久刷新一次，由 Google、Outlook、Apple Calendar 等客户端决定。</p></section>
-    <aside class="card card-body"><h2>数据最小化</h2><ul class="detail-copy"><li>成员 WQ_ID 使用 HMAC 作为登录索引，并加密保存供管理员查看使用统计。</li><li>登录令牌仅以哈希形式保存。</li><li>管理员可以查看成员的登录、活跃与订阅状态。</li><li>不收集投稿邮箱，也不在 GitHub Pages 中嵌入成员或会议数据。</li><li>成员停用后会话与订阅立即失效。</li></ul></aside>
+    <section class="card card-body detail-copy">
+      <h2>1. 查找并注册会议</h2>
+      <p>进入“日历”后，可在议程和月历之间切换，并按关键词、类别、语言或会议形式筛选。点击“立即注册”会直接打开会议注册页面；点击“查看详情”可以先查看完整时间和会议信息。</p>
+
+      <h2>2. 提交会议</h2>
+      <p>进入“投稿”，填写会议标题、类别、语言、注册链接、北京时间和持续时长。投稿后会进入审核队列，管理员通过后才会显示在公共日历中。</p>
+
+      <h2>3. 查看审核结果</h2>
+      <p>在“我的投稿”中可以查看待审核、已发布或未通过的会议。若管理员留下反馈，也会显示在对应投稿下方。</p>
+
+      <div class="inline">
+        <RouterLink class="button" to="/submit">提交会议</RouterLink>
+        <RouterLink class="button secondary" to="/submissions">查看我的投稿</RouterLink>
+      </div>
+    </section>
+
+    <aside class="stack">
+      <section class="card card-body detail-copy">
+        <h2>4. 设置日历提醒</h2>
+        <p>进入“提醒”，选择不提醒、提前 10 分钟、30 分钟、1 小时或 1 天，然后生成个人订阅地址，并在 Google、Outlook 或 Apple Calendar 中通过 URL 添加订阅。</p>
+        <p>订阅地址属于个人访问凭证，请勿转发。旋转或撤销后，旧地址会立即失效。</p>
+        <RouterLink class="button secondary" to="/calendar-settings">设置提醒</RouterLink>
+      </section>
+
+      <section class="card card-body detail-copy">
+        <h2>使用提示</h2>
+        <ul>
+          <li>网站中的会议时间统一显示为北京时间。</li>
+          <li>单场会议可在详情页下载 .ics，也可直接添加到 Google Calendar。</li>
+          <li>周期会议在议程中只显示最近一场，可在月历中查看具体日期。</li>
+          <li>订阅刷新和提醒触发时间由所使用的日历客户端决定。</li>
+        </ul>
+      </section>
+    </aside>
   </div>
 </template>
