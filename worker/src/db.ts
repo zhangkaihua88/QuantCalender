@@ -2,7 +2,7 @@ import type { Env, SessionRecord } from './env'
 import type { EventRow, ExceptionRow } from './events'
 
 export async function listPublishedEvents(env: Env): Promise<EventRow[]> {
-  const result = await env.DB.prepare("SELECT * FROM events WHERE status IN ('published', 'cancelled') ORDER BY start_utc ASC").all<EventRow>()
+  const result = await env.DB.prepare("SELECT * FROM events WHERE status IN ('published', 'cancelled') ORDER BY start_beijing ASC").all<EventRow>()
   return result.results
 }
 
