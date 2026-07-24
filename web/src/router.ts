@@ -1,0 +1,36 @@
+import { createRouter, createWebHashHistory } from 'vue-router'
+import { bootstrapSession, session } from './state'
+import LoginView from './views/LoginView.vue'
+import CalendarView from './views/CalendarView.vue'
+import MeetingDetailView from './views/MeetingDetailView.vue'
+import SubmitView from './views/SubmitView.vue'
+import MySubmissionsView from './views/MySubmissionsView.vue'
+import CalendarSettingsView from './views/CalendarSettingsView.vue'
+import AdminView from './views/AdminView.vue'
+import AboutView from './views/AboutView.vue'
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes: [
+    { path: '/login', component: LoginView, meta: { public: true } },
+    { path: '/', component: CalendarView },
+    { path: '/meetings/:id', component: MeetingDetailView },
+    { path: '/submit', component: SubmitView, meta: { member: true } },
+    { path: '/submissions', component: MySubmissionsView, meta: { member: true } },
+    { path: '/calendar-settings', component: CalendarSettingsView, meta: { member: true } },
+    { path: '/admin', component: AdminView, meta: { admin: true } },
+    { path: '/about', component: AboutView },
+    { path: '/:pathMatch(.*)*', redirect: '/' }
+  ]
+})
+
+router.beforeEach(async (to) => {
+  await bootstrapSession()
+  if (to.meta.public) return session.user ? '/' : true
+  if (!session.user) return '/login'
+  if (to.meta.admin && session.user.role !== 'admin') return '/'
+  if (to.meta.member && session.user.role !== 'member') return '/admin'
+  return true
+})
+
+export default router

@@ -1,0 +1,24 @@
+{
+  "name": "@wq-calendar/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "@wq-calendar/shared": "workspace:*",
+    "hono": "^4.7.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250712.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.8",
+    "wrangler": "^4.20.0"
+  }
+}
