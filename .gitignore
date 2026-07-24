@@ -12,3 +12,4 @@ members.csv
 members-*.csv
 .DS_Store
 Thumbs.db
+DEPLOYMENT.md

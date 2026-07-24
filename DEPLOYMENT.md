@@ -2,8 +2,8 @@
 
 本文对应当前仓库中的 GitHub Actions 配置，推荐架构为：
 
-- 前端：GitHub Pages，域名 `calendar.hualabtech.com`
-- API：Cloudflare Worker，域名 `api.calendar.hualabtech.com`
+- 前端：GitHub Pages，域名 `wqcalendar.hualabtech.com`
+- API：Cloudflare Worker，域名 `api.wqcalendar.hualabtech.com`
 - 数据库：Cloudflare D1
 - 登录防护：Cloudflare Turnstile
 
@@ -18,11 +18,30 @@
 1. 一个 GitHub 账号和一个新的 GitHub 仓库。
 2. 一个 Cloudflare 账号。
 3. 一个已经接入 Cloudflare DNS 的自有域名。
-4. Windows 本机安装 Git 和 Node.js 22。
+4. Windows 本机安装 Git 和 Node.js 22，或者使用 Codex 当前任务自带的 Node/pnpm 运行环境。
 5. 一个指定的管理员 WQ_ID，以及至少 20 位的随机管理员密码。
 6. 正式 CN/HK 成员 CSV；它只在上线后由管理员导入，不提交到 GitHub。
 
-在 PowerShell 中进入项目并检查环境：
+### 方案 A：当前 Codex 任务的 PowerShell（已经实测）
+
+当前 Codex PowerShell 能直接找到 Git 和 pnpm，但 Node 没有公开在默认 PATH 中，而且没有 `corepack` 命令。请使用以下完整命令：
+
+```powershell
+cd "D:\CALL\Desktop\Supervisor\杂项\号池\wq-meeting-calendar"
+$env:PATH="C:\Users\Kaihua\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin;C:\Users\Kaihua\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback;$env:PATH"
+$env:XDG_CONFIG_HOME=(Join-Path (Get-Location) '.wrangler-home')
+node --version
+git --version
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm check
+```
+
+当前实测版本为 Node `v24.14.0`、Git `2.47.1.windows.2`、pnpm `11.9.0`，安装、测试和构建均能通过。这里不需要运行 `corepack enable`。
+
+### 方案 B：普通 Windows Terminal / PowerShell
+
+如果希望在 Codex 之外执行，请先安装 Node.js 22，然后运行：
 
 ```powershell
 cd "D:\CALL\Desktop\Supervisor\杂项\号池\wq-meeting-calendar"
@@ -35,6 +54,8 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
+若系统提示 `node` 或 `corepack` 不是命令，说明普通 PowerShell 尚未正确安装 Node.js，或者安装后没有重新打开终端。
+
 只有 `pnpm check` 全部通过后再部署。
 
 ## 二、确定正式域名
@@ -43,16 +64,16 @@ pnpm check
 
 | 用途 | 正式值 |
 | --- | --- |
-| 前端来源 | `https://calendar.hualabtech.com` |
-| API 地址 | `https://api.calendar.hualabtech.com` |
-| GitHub Pages 自定义域名 | `calendar.hualabtech.com` |
-| Worker Custom Domain | `api.calendar.hualabtech.com` |
+| 前端来源 | `https://wqcalendar.hualabtech.com` |
+| API 地址 | `https://api.wqcalendar.hualabtech.com` |
+| GitHub Pages 自定义域名 | `wqcalendar.hualabtech.com` |
+| Worker Custom Domain | `api.wqcalendar.hualabtech.com` |
 
 注意：
 
 - `CALENDAR_ORIGIN` 必须是精确来源，不带末尾 `/`。
 - API 地址必须使用 HTTPS。
-- 不要提前为 `api.calendar.hualabtech.com` 创建 CNAME；Cloudflare 添加 Worker Custom Domain 时会自动创建 DNS 和证书。
+- 不要提前为 `api.wqcalendar.hualabtech.com` 创建 CNAME；Cloudflare 添加 Worker Custom Domain 时会自动创建 DNS 和证书。
 
 ## 三、生成管理员密码验证值和密钥
 
@@ -86,7 +107,7 @@ node worker/scripts/hash-admin-password.mjs
 1. 进入 Cloudflare Dashboard → **Turnstile**。
 2. 创建名为 `WQ Meeting Calendar Login` 的 Widget。
 3. 模式选择 **Managed**。
-4. 允许的 hostname 添加 `calendar.hualabtech.com`。
+4. 允许的 hostname 添加 `wqcalendar.hualabtech.com`。
 5. 保存并复制：
    - Sitekey：之后填入 GitHub Variable `VITE_TURNSTILE_SITE_KEY`。
    - Secret key：之后填入 GitHub Secret `TURNSTILE_SECRET`。
@@ -97,6 +118,10 @@ Sitekey 可以公开；Secret key 只能放在 Worker Secret/GitHub Secret。Tur
 
 ## 五、创建 D1 数据库
 
+### 普通 Windows PowerShell：使用浏览器 OAuth
+
+请在 Codex 之外的 Windows Terminal / PowerShell 中运行。Wrangler 在 Codex、容器或其他隔离环境中运行时，浏览器可能无法访问临时的 `localhost:8976` 回调服务器，表现为浏览器已经授权但命令一直等待。
+
 在项目根目录运行：
 
 ```powershell
@@ -104,10 +129,40 @@ pnpm --filter @wq-calendar/worker exec wrangler login
 pnpm --filter @wq-calendar/worker exec wrangler d1 create wq-meeting-calendar
 ```
 
+如果默认回调仍失败，可停止命令后重新运行：
+
+```powershell
+pnpm --filter @wq-calendar/worker exec wrangler login --callback-host=127.0.0.1
+```
+
+不要公开浏览器回调 URL；其中包含与本次登录状态绑定的一次性授权码。
+
+### 当前 Codex PowerShell：推荐使用 API Token
+
+先按照下一节创建 Cloudflare API Token 和取得 Account ID，然后在 Codex PowerShell 中执行：
+
+```powershell
+cd "D:\CALL\Desktop\Supervisor\杂项\号池\wq-meeting-calendar"
+$env:PATH="C:\Users\Kaihua\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin;C:\Users\Kaihua\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback;$env:PATH"
+$env:XDG_CONFIG_HOME=(Join-Path (Get-Location) '.wrangler-home')
+
+$secureToken = Read-Host "粘贴 Cloudflare API Token" -AsSecureString
+$env:CLOUDFLARE_API_TOKEN = [System.Net.NetworkCredential]::new('', $secureToken).Password
+$env:CLOUDFLARE_ACCOUNT_ID = "b4def5add7e193d2db7479a694383440"
+
+pnpm --filter @wq-calendar/worker exec wrangler whoami
+pnpm --filter @wq-calendar/worker exec wrangler d1 create wq-meeting-calendar
+
+Remove-Item Env:CLOUDFLARE_API_TOKEN
+Remove-Item Env:CLOUDFLARE_ACCOUNT_ID
+```
+
+`Read-Host -AsSecureString` 可以避免 Token 出现在屏幕和命令历史中。不要把 Token 写入项目文件。
+
 浏览器会要求登录 Cloudflare。创建成功后会显示一个 UUID 格式的 `database_id`，保存为：
 
 ```text
-CLOUDFLARE_D1_DATABASE_ID=<这里填写 database_id>
+CLOUDFLARE_D1_DATABASE_ID=f3f6069f-4460-4d1b-b585-6b1097e28566
 ```
 
 不要创建第二个同名数据库。数据库迁移会由 GitHub Actions 自动执行。
@@ -125,7 +180,7 @@ pnpm --filter @wq-calendar/worker exec wrangler d1 list
 1. Cloudflare Dashboard → **My Profile** → **API Tokens**。
 2. 创建 Custom Token，范围仅限制到部署所用的 Cloudflare Account。
 3. 至少授予：
-   - Account / Workers Scripts / Edit
+   - Account / Workers Scripts / Write（如果界面仍显示 Edit，选择对应的可写权限）
    - Account / D1 / Edit
 4. 如 Wrangler 报告缺少账户读取权限，再加入 Account Settings / Read。
 5. 保存生成的 Token；离开页面后通常无法再次查看完整值。
@@ -155,9 +210,9 @@ pnpm --filter @wq-calendar/worker exec wrangler d1 list
 | 名称 | 示例值 | 说明 |
 | --- | --- | --- |
 | `CLOUDFLARE_D1_DATABASE_ID` | D1 返回的 UUID | D1 数据库 ID |
-| `VITE_API_BASE_URL` | `https://api.calendar.hualabtech.com` | 前端调用 API、Worker 生成订阅链接使用 |
+| `VITE_API_BASE_URL` | `https://api.wqcalendar.hualabtech.com` | 前端调用 API、Worker 生成订阅链接使用 |
 | `VITE_TURNSTILE_SITE_KEY` | Turnstile Sitekey | 可以公开 |
-| `CALENDAR_ORIGIN` | `https://calendar.hualabtech.com` | Worker CORS/CSRF 精确来源，不带 `/` |
+| `CALENDAR_ORIGIN` | `https://wqcalendar.hualabtech.com` | Worker CORS/CSRF 精确来源，不带 `/` |
 
 不要创建 `VITE_BASE_PATH`；自定义域名部署时应保持为空。只有临时使用 `https://QuantCalender.github.io/wq-meeting-calendar/` 时才设为 `/wq-meeting-calendar/`，但该地址不适合作为正式登录站点。
 
@@ -216,7 +271,7 @@ git push -u origin main
 1. GitHub 仓库 → **Settings → Pages**。
 2. Source 选择 **GitHub Actions**。
 3. 如果 Pages 工作流此前失败，回到 Actions 重新运行 `Deploy GitHub Pages`。
-4. 在 **Custom domain** 中填写 `calendar.hualabtech.com`。
+4. 在 **Custom domain** 中填写 `wqcalendar.hualabtech.com`。
 5. 根据 GitHub 提示在 Cloudflare DNS 添加：
 
 | Type | Name | Target | Proxy status |
@@ -235,7 +290,7 @@ Worker 首次部署成功后：
 1. Cloudflare Dashboard → **Workers & Pages**。
 2. 选择 `wq-meeting-calendar-api`。
 3. **Settings → Domains & Routes → Add → Custom Domain**。
-4. 输入 `api.calendar.hualabtech.com`。
+4. 输入 `api.wqcalendar.hualabtech.com`。
 5. 确认添加。
 
 Cloudflare 会自动创建 DNS 记录并签发证书。该 hostname 不能已有冲突的 CNAME。
@@ -243,7 +298,7 @@ Cloudflare 会自动创建 DNS 记录并签发证书。该 hostname 不能已有
 测试：
 
 ```powershell
-Invoke-RestMethod https://api.calendar.hualabtech.com/health
+Invoke-RestMethod https://api.wqcalendar.hualabtech.com/health
 ```
 
 预期结果包含：
@@ -262,7 +317,7 @@ Invoke-RestMethod https://api.calendar.hualabtech.com/health
 打开：
 
 ```text
-https://calendar.hualabtech.com
+https://wqcalendar.hualabtech.com
 ```
 
 按照以下顺序操作：
@@ -290,8 +345,8 @@ EXAMPLE_002,HK,2026-07-24
 
 ### 域名与网络
 
-- [ ] `https://calendar.hualabtech.com` 可以打开。
-- [ ] `https://api.calendar.hualabtech.com/health` 返回 `ok`。
+- [ ] `https://wqcalendar.hualabtech.com` 可以打开。
+- [ ] `https://api.wqcalendar.hualabtech.com/health` 返回 `ok`。
 - [ ] 页面和 API 均无证书警告。
 - [ ] 浏览器请求没有 CORS 错误。
 
@@ -317,7 +372,7 @@ EXAMPLE_002,HK,2026-07-24
 ### Turnstile
 
 - [ ] 正式页面显示 Turnstile。
-- [ ] Turnstile Dashboard hostname 是 `calendar.hualabtech.com`。
+- [ ] Turnstile Dashboard hostname 是 `wqcalendar.hualabtech.com`。
 - [ ] Sitekey 与 Secret 属于同一个 Widget。
 - [ ] 登录失败后 Widget 可以刷新并重新验证。
 
@@ -331,7 +386,7 @@ EXAMPLE_002,HK,2026-07-24
 
 ### 页面能打开，但一直无法保持登录
 
-- 检查前端和 API 是否分别为 `calendar.hualabtech.com` 与 `api.calendar.hualabtech.com`。
+- 检查前端和 API 是否分别为 `wqcalendar.hualabtech.com` 与 `api.wqcalendar.hualabtech.com`。
 - 两者必须 HTTPS 且属于同一主域名。
 - 检查 Worker 的 `APP_ENV` 是否由工作流设为 `production`。
 - 检查浏览器中是否生成了 `__Host-wq_session`。
@@ -339,8 +394,8 @@ EXAMPLE_002,HK,2026-07-24
 ### 出现 CORS 或 `CSRF_FAILED`
 
 - `CALENDAR_ORIGIN` 必须与地址栏来源完全一致。
-- 正确值类似 `https://calendar.hualabtech.com`，不能有末尾 `/`。
-- `VITE_API_BASE_URL` 必须是 `https://api.calendar.hualabtech.com`。
+- 正确值类似 `https://wqcalendar.hualabtech.com`，不能有末尾 `/`。
+- `VITE_API_BASE_URL` 必须是 `https://api.wqcalendar.hualabtech.com`。
 - 修改变量后同时重新运行 Pages 和 Worker 部署。
 
 ### Worker 工作流提示 D1 不存在
@@ -367,7 +422,14 @@ EXAMPLE_002,HK,2026-07-24
 
 - 检查 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`。
 - 检查 Token 资源范围是否包含正确 Account。
-- 检查 Workers Scripts Edit 与 D1 Edit 权限。
+- 检查 Workers Scripts Write（或界面中的 Edit）与 D1 Edit 权限。
+
+### `wrangler login` 授权后一直等待
+
+- 按 `Ctrl+C` 停止当前命令，不要重复使用或公开旧回调 URL。
+- 这是浏览器无法访问隔离环境中 `localhost:8976` 回调监听器造成的。
+- 推荐按第五节改用 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`。
+- 或者在 Codex 之外的普通 Windows PowerShell 中重新运行登录。
 
 ## 十五、后续更新与回滚
 
