@@ -16,6 +16,7 @@ type UsageMember = {
   subscriptionCreatedAt: string | null; subscriptionUpdatedAt: string | null
 }
 type UsageSummary = { activeMembers: number; loggedInMembers: number; active30Days: number; subscribedMembers: number; subscriptionRate: number }
+type UsagePagination = { page: number; pageSize: number; total: number; totalPages: number }
 const router = useRouter()
 const tab = ref<Tab>('pending')
 const pending = ref<any[]>([])
@@ -28,6 +29,8 @@ const usageLoaded = ref(false)
 const usageLoading = ref(false)
 const usageQuery = ref('')
 const usageFilter = ref<UsageFilter>('all')
+const usagePageSize = ref(50)
+const usagePagination = ref<UsagePagination>({ page: 1, pageSize: 50, total: 0, totalPages: 1 })
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
@@ -105,28 +108,35 @@ async function cancelEvent(id: string) {
 }
 
 const selectedOccurrenceOptions = computed(() => occurrences.value.filter((item) => !exceptionEventId.value || item.eventId === exceptionEventId.value))
-const filteredUsageMembers = computed(() => usageMembers.value.filter((member) => {
-  const matchesQuery = !usageQuery.value || `${member.wqId} ${member.country}`.toLowerCase().includes(usageQuery.value.trim().toLowerCase())
-  const matchesFilter = usageFilter.value === 'all'
-    || (usageFilter.value === 'logged' && Boolean(member.firstLoginAt))
-    || (usageFilter.value === 'not_logged' && !member.firstLoginAt)
-    || (usageFilter.value === 'subscribed' && member.subscribed)
-    || (usageFilter.value === 'not_subscribed' && !member.subscribed)
-    || (usageFilter.value === 'active_session' && member.activeSessionCount > 0)
-  return matchesQuery && matchesFilter
-}))
 
 async function openUsage() {
   tab.value = 'usage'
   if (usageLoaded.value || usageLoading.value) return
+  await loadUsage(1)
+}
+
+async function loadUsage(page = usagePagination.value.page) {
   usageLoading.value = true; error.value = ''
   try {
-    const data = await api<{ summary: UsageSummary; members: UsageMember[] }>('/v1/admin/member-usage')
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(usagePageSize.value),
+      filter: usageFilter.value
+    })
+    if (usageQuery.value.trim()) params.set('q', usageQuery.value.trim())
+    const data = await api<{ summary: UsageSummary; pagination: UsagePagination; members: UsageMember[] }>(`/v1/admin/member-usage?${params}`)
     usageSummary.value = data.summary
     usageMembers.value = data.members
+    usagePagination.value = data.pagination
     usageLoaded.value = true
   } catch (caught) { error.value = caught instanceof ApiError ? caught.message : '使用统计加载失败' }
   finally { usageLoading.value = false }
+}
+
+function clearUsageFilters() {
+  usageQuery.value = ''
+  usageFilter.value = 'all'
+  void loadUsage(1)
 }
 
 function formatUsageTime(value: string | null) {
@@ -243,14 +253,21 @@ async function revokeAllAdminSessions() {
       </div>
       <div class="card card-body">
         <div class="usage-toolbar">
-          <div><h2>成员明细</h2><p class="fine-print">显示 {{ filteredUsageMembers.length }} / {{ usageMembers.length }} 名；所有时间均为北京时间。</p></div>
+          <div><h2>成员明细</h2><p class="fine-print">共 {{ usagePagination.total }} 名，当前第 {{ usagePagination.page }} / {{ usagePagination.totalPages }} 页；所有时间均为北京时间。</p></div>
           <div class="inline">
-            <input v-model="usageQuery" aria-label="搜索 WQ_ID" placeholder="搜索 WQ_ID" />
+            <input v-model="usageQuery" aria-label="精确搜索 WQ_ID" placeholder="精确搜索 WQ_ID" @keyup.enter="loadUsage(1)" />
             <select v-model="usageFilter" aria-label="筛选使用状态"><option value="all">全部成员</option><option value="logged">已登录</option><option value="not_logged">未登录</option><option value="subscribed">已订阅</option><option value="not_subscribed">未订阅</option><option value="active_session">当前有会话</option></select>
+            <select v-model.number="usagePageSize" aria-label="每页显示数量" @change="loadUsage(1)"><option :value="25">每页 25 名</option><option :value="50">每页 50 名</option><option :value="100">每页 100 名</option></select>
+            <button class="button small" type="button" @click="loadUsage(1)">查询</button>
+            <button class="button secondary small" type="button" @click="clearUsageFilters">清除</button>
           </div>
         </div>
-        <table class="data-table usage-table"><thead><tr><th>WQ_ID</th><th>地区</th><th>首次登录</th><th>最近登录 / 活跃</th><th>登录次数</th><th>有效会话</th><th>日历订阅</th></tr></thead><tbody><tr v-for="member in filteredUsageMembers" :key="member.id"><td><strong>{{ member.wqId }}</strong><br><span v-if="!member.hasFullWqId" class="muted">重新登录或导入后补全</span><span v-if="!member.active" class="status rejected">已停用</span></td><td>{{ member.country }}</td><td>{{ formatUsageTime(member.firstLoginAt) }}</td><td>{{ formatUsageTime(member.lastLoginAt) }}<br><span class="muted">活跃：{{ formatUsageTime(member.lastActiveAt) }}</span></td><td>{{ member.loginCount }}</td><td><span class="status" :class="member.activeSessionCount ? 'published' : 'draft'">{{ member.activeSessionCount ? `${member.activeSessionCount} 个` : '无' }}</span></td><td><span class="status" :class="member.subscribed ? 'published' : 'draft'">{{ member.subscribed ? '已订阅' : '未订阅' }}</span><template v-if="member.subscribed"><br><span class="muted">{{ formatUsageTime(member.subscriptionCreatedAt) }}<br>{{ alarmLabel(member.alarmMinutes) }}</span></template></td></tr></tbody></table>
-        <div v-if="!filteredUsageMembers.length" class="empty-state">没有符合条件的成员。</div>
+        <table class="data-table usage-table"><thead><tr><th>WQ_ID</th><th>地区</th><th>首次登录</th><th>最近登录 / 活跃</th><th>登录次数</th><th>有效会话</th><th>日历订阅</th></tr></thead><tbody><tr v-for="member in usageMembers" :key="member.id"><td><strong>{{ member.wqId }}</strong><br><span v-if="!member.hasFullWqId" class="muted">重新登录或导入后补全</span><span v-if="!member.active" class="status rejected">已停用</span></td><td>{{ member.country }}</td><td>{{ formatUsageTime(member.firstLoginAt) }}</td><td>{{ formatUsageTime(member.lastLoginAt) }}<br><span class="muted">活跃：{{ formatUsageTime(member.lastActiveAt) }}</span></td><td>{{ member.loginCount }}</td><td><span class="status" :class="member.activeSessionCount ? 'published' : 'draft'">{{ member.activeSessionCount ? `${member.activeSessionCount} 个` : '无' }}</span></td><td><span class="status" :class="member.subscribed ? 'published' : 'draft'">{{ member.subscribed ? '已订阅' : '未订阅' }}</span><template v-if="member.subscribed"><br><span class="muted">{{ formatUsageTime(member.subscriptionCreatedAt) }}<br>{{ alarmLabel(member.alarmMinutes) }}</span></template></td></tr></tbody></table>
+        <div v-if="!usageMembers.length" class="empty-state">没有符合条件的成员。</div>
+        <div v-else class="pagination-bar">
+          <span class="fine-print">第 {{ (usagePagination.page - 1) * usagePagination.pageSize + 1 }}–{{ Math.min(usagePagination.page * usagePagination.pageSize, usagePagination.total) }} 名，共 {{ usagePagination.total }} 名</span>
+          <div class="inline"><button class="button secondary small" :disabled="usagePagination.page <= 1 || usageLoading" @click="loadUsage(usagePagination.page - 1)">上一页</button><button class="button secondary small" :disabled="usagePagination.page >= usagePagination.totalPages || usageLoading" @click="loadUsage(usagePagination.page + 1)">下一页</button></div>
+        </div>
       </div>
     </template>
   </section>

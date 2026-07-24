@@ -447,6 +447,62 @@ app.get('/v1/admin/member-usage', requireAuth('admin'), async (context) => {
     subscription_updated_at: number | null
   }
   const now = Date.now()
+  type UsageSummaryRow = {
+    active_members: number
+    logged_in_members: number
+    active_30_days: number
+    subscribed_members: number
+  }
+  const requestedPage = Number(context.req.query('page') || 1)
+  const requestedPageSize = Number(context.req.query('pageSize') || 50)
+  const pageSize = [25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
+  const filter = context.req.query('filter') || 'all'
+  const allowedFilters = ['all', 'logged', 'not_logged', 'subscribed', 'not_subscribed', 'active_session']
+  if (!allowedFilters.includes(filter)) return apiError(context, 422, 'INVALID_FILTER', '使用状态筛选无效')
+
+  const conditions: string[] = []
+  const conditionValues: Array<string | number> = []
+  const query = normalizeWqId(context.req.query('q') || '')
+  if (query) {
+    if (query.length > 64) return apiError(context, 422, 'INVALID_QUERY', 'WQ_ID 查询条件无效')
+    conditions.push('m.wq_id_hash = ?')
+    conditionValues.push(await hmacSha256(query, context.env.WQ_ID_HMAC_SECRET))
+  }
+  if (filter === 'logged') conditions.push('ma.first_login_at IS NOT NULL')
+  if (filter === 'not_logged') conditions.push('ma.first_login_at IS NULL')
+  if (filter === 'subscribed') conditions.push('ct.id IS NOT NULL AND m.active = 1')
+  if (filter === 'not_subscribed') conditions.push('(ct.id IS NULL OR m.active = 0)')
+  if (filter === 'active_session') conditions.push('COALESCE(active_sessions.session_count, 0) > 0')
+  const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const activeSince = now - 30 * 24 * 60 * 60 * 1000
+
+  const summary = await context.env.DB.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN m.active = 1 THEN 1 ELSE 0 END), 0) AS active_members,
+      COALESCE(SUM(CASE WHEN m.active = 1 AND ma.first_login_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS logged_in_members,
+      COALESCE(SUM(CASE WHEN m.active = 1 AND ma.last_active_at >= ?1 THEN 1 ELSE 0 END), 0) AS active_30_days,
+      COALESCE(SUM(CASE WHEN m.active = 1 AND ct.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS subscribed_members
+    FROM members m
+    LEFT JOIN member_activity ma ON ma.member_id = m.id
+    LEFT JOIN calendar_tokens ct ON ct.member_id = m.id AND ct.revoked_at IS NULL
+  `).bind(activeSince).first<UsageSummaryRow>()
+
+  const count = await context.env.DB.prepare(`
+    SELECT COUNT(*) AS count
+    FROM members m
+    LEFT JOIN member_activity ma ON ma.member_id = m.id
+    LEFT JOIN (
+      SELECT member_id, COUNT(*) AS session_count FROM sessions
+      WHERE role = 'member' AND expires_at > ? GROUP BY member_id
+    ) active_sessions ON active_sessions.member_id = m.id
+    LEFT JOIN calendar_tokens ct ON ct.member_id = m.id AND ct.revoked_at IS NULL
+    ${whereSql}
+  `).bind(now, ...conditionValues).first<{ count: number }>()
+  const total = count?.count || 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, Number.isFinite(requestedPage) ? Math.trunc(requestedPage) : 1), totalPages)
+  const offset = (page - 1) * pageSize
+
   const result = await context.env.DB.prepare(`
     SELECT m.id, m.wq_id_hint, m.wq_id_ciphertext, m.country, m.active, m.record_date,
       ma.first_login_at, ma.last_login_at, ma.last_active_at, COALESCE(ma.login_count, 0) AS login_count,
@@ -460,9 +516,10 @@ app.get('/v1/admin/member-usage', requireAuth('admin'), async (context) => {
       WHERE role = 'member' AND expires_at > ?1 GROUP BY member_id
     ) active_sessions ON active_sessions.member_id = m.id
     LEFT JOIN calendar_tokens ct ON ct.member_id = m.id AND ct.revoked_at IS NULL
+    ${whereSql}
     ORDER BY m.active DESC, COALESCE(ma.last_active_at, 0) DESC, m.country ASC, m.wq_id_hint ASC
-    LIMIT 5000
-  `).bind(now).all<UsageRow>()
+    LIMIT ? OFFSET ?
+  `).bind(now, ...conditionValues, pageSize, offset).all<UsageRow>()
 
   const members = await Promise.all(result.results.map(async (row) => {
     let wqId: string | null = null
@@ -487,19 +544,18 @@ app.get('/v1/admin/member-usage', requireAuth('admin'), async (context) => {
       subscriptionUpdatedAt: row.subscription_updated_at ? new Date(row.subscription_updated_at).toISOString() : null
     }
   }))
-  const activeMembers = members.filter((member) => member.active)
-  const loggedInMembers = activeMembers.filter((member) => member.firstLoginAt)
-  const activeSince = now - 30 * 24 * 60 * 60 * 1000
-  const active30Days = activeMembers.filter((member) => member.lastActiveAt && Date.parse(member.lastActiveAt) >= activeSince).length
-  const subscribedMembers = activeMembers.filter((member) => member.subscribed).length
+  const activeMembers = summary?.active_members || 0
+  const loggedInMembers = summary?.logged_in_members || 0
+  const subscribedMembers = summary?.subscribed_members || 0
   return context.json({
     summary: {
-      activeMembers: activeMembers.length,
-      loggedInMembers: loggedInMembers.length,
-      active30Days,
+      activeMembers,
+      loggedInMembers,
+      active30Days: summary?.active_30_days || 0,
       subscribedMembers,
-      subscriptionRate: loggedInMembers.length ? Math.round(subscribedMembers / loggedInMembers.length * 1000) / 10 : 0
+      subscriptionRate: loggedInMembers ? Math.round(subscribedMembers / loggedInMembers * 1000) / 10 : 0
     },
+    pagination: { page, pageSize, total, totalPages },
     members
   })
 })
