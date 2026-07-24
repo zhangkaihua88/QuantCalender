@@ -7,13 +7,27 @@ import { api, ApiError } from '../api'
 import { session } from '../state'
 import MeetingForm from '../components/MeetingForm.vue'
 
-type Tab = 'pending' | 'events' | 'members' | 'audit'
+type Tab = 'pending' | 'events' | 'members' | 'usage' | 'audit'
+type UsageFilter = 'all' | 'logged' | 'not_logged' | 'subscribed' | 'not_subscribed' | 'active_session'
+type UsageMember = {
+  id: string; wqId: string; hasFullWqId: boolean; country: 'CN' | 'HK'; active: boolean; recordDate: string
+  firstLoginAt: string | null; lastLoginAt: string | null; lastActiveAt: string | null; loginCount: number
+  activeSessionCount: number; subscribed: boolean; alarmMinutes: number | null
+  subscriptionCreatedAt: string | null; subscriptionUpdatedAt: string | null
+}
+type UsageSummary = { activeMembers: number; loggedInMembers: number; active30Days: number; subscribedMembers: number; subscriptionRate: number }
 const router = useRouter()
 const tab = ref<Tab>('pending')
 const pending = ref<any[]>([])
 const events = ref<any[]>([])
 const occurrences = ref<MeetingOccurrence[]>([])
 const logs = ref<any[]>([])
+const usageMembers = ref<UsageMember[]>([])
+const usageSummary = ref<UsageSummary>({ activeMembers: 0, loggedInMembers: 0, active30Days: 0, subscribedMembers: 0, subscriptionRate: 0 })
+const usageLoaded = ref(false)
+const usageLoading = ref(false)
+const usageQuery = ref('')
+const usageFilter = ref<UsageFilter>('all')
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
@@ -91,6 +105,38 @@ async function cancelEvent(id: string) {
 }
 
 const selectedOccurrenceOptions = computed(() => occurrences.value.filter((item) => !exceptionEventId.value || item.eventId === exceptionEventId.value))
+const filteredUsageMembers = computed(() => usageMembers.value.filter((member) => {
+  const matchesQuery = !usageQuery.value || `${member.wqId} ${member.country}`.toLowerCase().includes(usageQuery.value.trim().toLowerCase())
+  const matchesFilter = usageFilter.value === 'all'
+    || (usageFilter.value === 'logged' && Boolean(member.firstLoginAt))
+    || (usageFilter.value === 'not_logged' && !member.firstLoginAt)
+    || (usageFilter.value === 'subscribed' && member.subscribed)
+    || (usageFilter.value === 'not_subscribed' && !member.subscribed)
+    || (usageFilter.value === 'active_session' && member.activeSessionCount > 0)
+  return matchesQuery && matchesFilter
+}))
+
+async function openUsage() {
+  tab.value = 'usage'
+  if (usageLoaded.value || usageLoading.value) return
+  usageLoading.value = true; error.value = ''
+  try {
+    const data = await api<{ summary: UsageSummary; members: UsageMember[] }>('/v1/admin/member-usage')
+    usageSummary.value = data.summary
+    usageMembers.value = data.members
+    usageLoaded.value = true
+  } catch (caught) { error.value = caught instanceof ApiError ? caught.message : '使用统计加载失败' }
+  finally { usageLoading.value = false }
+}
+
+function formatUsageTime(value: string | null) {
+  return value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '—'
+}
+
+function alarmLabel(minutes: number | null) {
+  if (minutes === 1440) return '提前 1 天'
+  return minutes ? `提前 ${minutes} 分钟` : '—'
+}
 
 async function saveException() {
   if (!exceptionEventId.value || !exceptionOccurrence.value) { error.value = '请选择会议和具体场次'; return }
@@ -143,7 +189,7 @@ async function importMembers() {
       importProgress.value = `已暂存 ${Math.min(offset + 100, csvRows.value.length)} / ${csvRows.value.length}`
     }
     await api(`/v1/admin/member-imports/${created.importId}/commit`, { method:'POST', body:'{}' })
-    notice.value = `已启用 ${csvRows.value.length} 名 CN/HK 成员。`; importProgress.value = ''; csvRows.value = []; csvFile.value = null
+    notice.value = `已启用 ${csvRows.value.length} 名 CN/HK 成员。`; importProgress.value = ''; csvRows.value = []; csvFile.value = null; usageLoaded.value = false
   } catch (caught) { error.value = caught instanceof ApiError ? caught.message : '成员导入失败' }
   finally { busy.value = false }
 }
@@ -160,7 +206,7 @@ async function revokeAllAdminSessions() {
   <div class="page-head"><div><p class="eyebrow">ADMIN CONSOLE</p><h1>日历管理</h1><p class="subtitle">审批成员投稿、维护会议系列和更新 CN/HK 成员名单。所有关键操作都会写入审计日志。</p></div><button class="button" @click="createEvent"><Plus :size="17" />新建会议</button></div>
   <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div><div v-if="notice" class="success-box" style="margin-bottom:14px">{{ notice }}</div>
 
-  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">待审核 {{ pending.length }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
+  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">待审核 {{ pending.length }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='usage'}" @click="openUsage">使用统计</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
 
   <section v-if="editorOpen" class="card card-body" style="margin-bottom:22px"><div class="section-title"><h2>{{ editing ? '编辑会议' : '创建会议' }}</h2><button class="icon-button" @click="editorOpen=false"><XCircle :size="19" /></button></div><div v-if="!editing || editing.status === 'draft'" class="field" style="max-width:280px;margin-bottom:16px"><label for="editor-status">保存状态</label><select id="editor-status" v-model="editorStatus"><option value="draft">保存为草稿</option><option value="published">立即发布</option></select></div><MeetingForm :initial="editing ? meetingFromEvent(editing) : undefined" :busy="busy" :submit-label="editing ? '保存修改' : editorStatus === 'draft' ? '保存草稿' : '发布会议'" @submit="saveEvent" /></section>
 
@@ -183,7 +229,30 @@ async function revokeAllAdminSessions() {
 
   <section v-if="tab==='members'" class="panel-grid">
     <div class="card card-body stack"><h2>整体替换成员名单</h2><div class="notice-box">CSV 表头必须为 <code>wq_id,country</code>。只接受 CN/HK，重复 ID、额外列或非法行会阻止提交；导入日期由系统自动记录。</div><label class="button secondary" style="width:max-content"><FileUp :size="17" />选择 CSV<input type="file" accept=".csv,text/csv" hidden @change="onCsvChange" /></label><p v-if="csvFile">已选择：{{ csvFile.name }}</p><div v-if="csvRows.length" class="success-box">有效成员 {{ csvRows.length }} 名，其中 CN {{ csvRows.filter(r=>r.country==='CN').length }} 名、HK {{ csvRows.filter(r=>r.country==='HK').length }} 名。</div><div v-if="csvInvalid.length" class="error-box"><strong>发现 {{ csvInvalid.length }} 个问题</strong><ul><li v-for="item in csvInvalid.slice(0,10)" :key="item">{{ item }}</li></ul></div><p v-if="importProgress" class="muted">{{ importProgress }}</p><button class="button" :disabled="busy || !csvRows.length || !!csvInvalid.length" @click="importMembers">{{ busy ? '正在导入…' : '确认整体替换' }}</button></div>
-    <aside class="card card-body"><h2>安全操作</h2><p class="fine-print">WQ_ID 会在服务端转换为带密钥 HMAC，原始 CSV 不会进入数据库或仓库。</p><div class="divider"></div><button class="button danger" @click="revokeAllAdminSessions"><ShieldX :size="17" />撤销全部管理员会话</button></aside>
+    <aside class="card card-body"><h2>安全操作</h2><p class="fine-print">WQ_ID 使用 HMAC 作为登录索引，并保存一份仅管理员接口可解密的加密值；原始 CSV 不会进入仓库。</p><div class="divider"></div><button class="button danger" @click="revokeAllAdminSessions"><ShieldX :size="17" />撤销全部管理员会话</button></aside>
+  </section>
+
+  <section v-if="tab==='usage'" class="stack">
+    <div v-if="usageLoading" class="empty-state">正在整理成员使用情况…</div>
+    <template v-else-if="usageLoaded">
+      <div class="metric-grid">
+        <div class="card metric-card"><span>有效成员</span><strong>{{ usageSummary.activeMembers }}</strong></div>
+        <div class="card metric-card"><span>已登录成员</span><strong>{{ usageSummary.loggedInMembers }}</strong></div>
+        <div class="card metric-card"><span>近 30 天活跃</span><strong>{{ usageSummary.active30Days }}</strong></div>
+        <div class="card metric-card"><span>有效订阅</span><strong>{{ usageSummary.subscribedMembers }}</strong><small>已登录成员的 {{ usageSummary.subscriptionRate }}%</small></div>
+      </div>
+      <div class="card card-body">
+        <div class="usage-toolbar">
+          <div><h2>成员明细</h2><p class="fine-print">显示 {{ filteredUsageMembers.length }} / {{ usageMembers.length }} 名；所有时间均为北京时间。</p></div>
+          <div class="inline">
+            <input v-model="usageQuery" aria-label="搜索 WQ_ID" placeholder="搜索 WQ_ID" />
+            <select v-model="usageFilter" aria-label="筛选使用状态"><option value="all">全部成员</option><option value="logged">已登录</option><option value="not_logged">未登录</option><option value="subscribed">已订阅</option><option value="not_subscribed">未订阅</option><option value="active_session">当前有会话</option></select>
+          </div>
+        </div>
+        <table class="data-table usage-table"><thead><tr><th>WQ_ID</th><th>地区</th><th>首次登录</th><th>最近登录 / 活跃</th><th>登录次数</th><th>有效会话</th><th>日历订阅</th></tr></thead><tbody><tr v-for="member in filteredUsageMembers" :key="member.id"><td><strong>{{ member.wqId }}</strong><br><span v-if="!member.hasFullWqId" class="muted">重新登录或导入后补全</span><span v-if="!member.active" class="status rejected">已停用</span></td><td>{{ member.country }}</td><td>{{ formatUsageTime(member.firstLoginAt) }}</td><td>{{ formatUsageTime(member.lastLoginAt) }}<br><span class="muted">活跃：{{ formatUsageTime(member.lastActiveAt) }}</span></td><td>{{ member.loginCount }}</td><td><span class="status" :class="member.activeSessionCount ? 'published' : 'draft'">{{ member.activeSessionCount ? `${member.activeSessionCount} 个` : '无' }}</span></td><td><span class="status" :class="member.subscribed ? 'published' : 'draft'">{{ member.subscribed ? '已订阅' : '未订阅' }}</span><template v-if="member.subscribed"><br><span class="muted">{{ formatUsageTime(member.subscriptionCreatedAt) }}<br>{{ alarmLabel(member.alarmMinutes) }}</span></template></td></tr></tbody></table>
+        <div v-if="!filteredUsageMembers.length" class="empty-state">没有符合条件的成员。</div>
+      </div>
+    </template>
   </section>
 
   <section v-if="tab==='audit'" class="card card-body"><table class="data-table"><thead><tr><th>时间</th><th>操作</th><th>对象</th><th>角色</th></tr></thead><tbody><tr v-for="item in logs" :key="item.id"><td>{{ new Date(item.created_at).toLocaleString('zh-CN') }}</td><td>{{ item.action }}</td><td>{{ item.entity_type }} · {{ item.entity_id.slice(0,8) }}</td><td>{{ item.actor_role }}</td></tr></tbody></table></section>

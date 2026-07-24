@@ -26,7 +26,7 @@ import {
   verifyMutation,
   verifyTurnstile
 } from './auth'
-import { hmacSha256, normalizeWqId, randomToken, sha256, wqIdHint } from './crypto'
+import { decryptWqId, encryptWqId, hmacSha256, normalizeWqId, randomToken, sha256, wqIdHint } from './crypto'
 import { audit, listEventExceptions, listPublishedEvents } from './db'
 import { expandEvent, normalizeMeetingTimes, publicEvent, type EventRow } from './events'
 import { buildCalendarIcs } from './ics'
@@ -143,6 +143,8 @@ app.post('/v1/session/member', async (context) => {
     return apiError(context, 401, 'LOGIN_FAILED', 'WQ_ID 不存在或当前不可用')
   }
   await clearLoginFailures(context.env, rateKey)
+  await context.env.DB.prepare('UPDATE members SET wq_id_ciphertext = COALESCE(wq_id_ciphertext, ?2), updated_at = ?3 WHERE id = ?1')
+    .bind(member.id, await encryptWqId(wqId, context.env.WQ_ID_HMAC_SECRET), Date.now()).run()
   const created = await createSession(context, 'member', member.id)
   return context.json({ user: { role: 'member', memberId: member.id, wqIdHint: member.wq_id_hint, country: member.country, expiresAt: new Date(created.expiresAt).toISOString() }, csrfToken: created.csrfToken })
 })
@@ -376,10 +378,18 @@ app.post('/v1/admin/member-imports/:id/rows', requireAuth('admin'), async (conte
   for (const row of parsed.data.rows) {
     const normalized = normalizeWqId(row.wqId)
     statements.push(context.env.DB.prepare(`
-      INSERT INTO member_import_rows (import_id, wq_id_hash, wq_id_hint, country, record_date)
-      VALUES (?1, ?2, ?3, ?4, ?5)
-      ON CONFLICT(import_id, wq_id_hash) DO UPDATE SET country = excluded.country, record_date = excluded.record_date
-    `).bind(context.req.param('id'), await hmacSha256(normalized, context.env.WQ_ID_HMAC_SECRET), wqIdHint(normalized), row.country, recordDate))
+      INSERT INTO member_import_rows (import_id, wq_id_hash, wq_id_hint, wq_id_ciphertext, country, record_date)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+      ON CONFLICT(import_id, wq_id_hash) DO UPDATE SET wq_id_ciphertext = excluded.wq_id_ciphertext,
+        country = excluded.country, record_date = excluded.record_date
+    `).bind(
+      context.req.param('id'),
+      await hmacSha256(normalized, context.env.WQ_ID_HMAC_SECRET),
+      wqIdHint(normalized),
+      await encryptWqId(normalized, context.env.WQ_ID_HMAC_SECRET),
+      row.country,
+      recordDate
+    ))
   }
   await context.env.DB.batch(statements)
   const count = await context.env.DB.prepare('SELECT COUNT(*) AS count FROM member_import_rows WHERE import_id = ?1').bind(context.req.param('id')).first<{ count: number }>()
@@ -403,10 +413,10 @@ app.post('/v1/admin/member-imports/:id/commit', requireAuth('admin'), async (con
   const now = Date.now()
   await context.env.DB.batch([
     context.env.DB.prepare(`
-      INSERT INTO members (id, wq_id_hash, wq_id_hint, country, record_date, active, import_batch_id, created_at, updated_at)
-      SELECT lower(hex(randomblob(16))), wq_id_hash, wq_id_hint, country, record_date, 1, ?1, ?2, ?2
+      INSERT INTO members (id, wq_id_hash, wq_id_hint, wq_id_ciphertext, country, record_date, active, import_batch_id, created_at, updated_at)
+      SELECT lower(hex(randomblob(16))), wq_id_hash, wq_id_hint, wq_id_ciphertext, country, record_date, 1, ?1, ?2, ?2
       FROM member_import_rows WHERE import_id = ?1 AND 1 = 1
-      ON CONFLICT(wq_id_hash) DO UPDATE SET wq_id_hint = excluded.wq_id_hint, country = excluded.country,
+      ON CONFLICT(wq_id_hash) DO UPDATE SET wq_id_hint = excluded.wq_id_hint, wq_id_ciphertext = excluded.wq_id_ciphertext, country = excluded.country,
         record_date = excluded.record_date, active = 1, import_batch_id = excluded.import_batch_id, updated_at = excluded.updated_at
     `).bind(importId, now),
     context.env.DB.prepare('UPDATE members SET active = 0, updated_at = ?2 WHERE wq_id_hash NOT IN (SELECT wq_id_hash FROM member_import_rows WHERE import_id = ?1)').bind(importId, now),
@@ -416,6 +426,82 @@ app.post('/v1/admin/member-imports/:id/commit', requireAuth('admin'), async (con
   ])
   await audit(context.env, session, 'commit_import', 'member_import', importId, { rows: batch.total_rows })
   return context.json({ committed: true, activeMembers: batch.total_rows })
+})
+
+app.get('/v1/admin/member-usage', requireAuth('admin'), async (context) => {
+  type UsageRow = {
+    id: string
+    wq_id_hint: string
+    wq_id_ciphertext: string | null
+    country: 'CN' | 'HK'
+    active: number
+    record_date: string
+    first_login_at: number | null
+    last_login_at: number | null
+    last_active_at: number | null
+    login_count: number
+    active_session_count: number
+    calendar_token_id: string | null
+    alarm_minutes: number | null
+    subscription_created_at: number | null
+    subscription_updated_at: number | null
+  }
+  const now = Date.now()
+  const result = await context.env.DB.prepare(`
+    SELECT m.id, m.wq_id_hint, m.wq_id_ciphertext, m.country, m.active, m.record_date,
+      ma.first_login_at, ma.last_login_at, ma.last_active_at, COALESCE(ma.login_count, 0) AS login_count,
+      COALESCE(active_sessions.session_count, 0) AS active_session_count,
+      ct.id AS calendar_token_id, ct.alarm_minutes, ct.created_at AS subscription_created_at,
+      ct.updated_at AS subscription_updated_at
+    FROM members m
+    LEFT JOIN member_activity ma ON ma.member_id = m.id
+    LEFT JOIN (
+      SELECT member_id, COUNT(*) AS session_count FROM sessions
+      WHERE role = 'member' AND expires_at > ?1 GROUP BY member_id
+    ) active_sessions ON active_sessions.member_id = m.id
+    LEFT JOIN calendar_tokens ct ON ct.member_id = m.id AND ct.revoked_at IS NULL
+    ORDER BY m.active DESC, COALESCE(ma.last_active_at, 0) DESC, m.country ASC, m.wq_id_hint ASC
+    LIMIT 5000
+  `).bind(now).all<UsageRow>()
+
+  const members = await Promise.all(result.results.map(async (row) => {
+    let wqId: string | null = null
+    if (row.wq_id_ciphertext) {
+      try { wqId = await decryptWqId(row.wq_id_ciphertext, context.env.WQ_ID_HMAC_SECRET) } catch { wqId = null }
+    }
+    return {
+      id: row.id,
+      wqId: wqId || row.wq_id_hint,
+      hasFullWqId: Boolean(wqId),
+      country: row.country,
+      active: row.active === 1,
+      recordDate: row.record_date,
+      firstLoginAt: row.first_login_at ? new Date(row.first_login_at).toISOString() : null,
+      lastLoginAt: row.last_login_at ? new Date(row.last_login_at).toISOString() : null,
+      lastActiveAt: row.last_active_at ? new Date(row.last_active_at).toISOString() : null,
+      loginCount: row.login_count,
+      activeSessionCount: row.active_session_count,
+      subscribed: Boolean(row.calendar_token_id) && row.active === 1,
+      alarmMinutes: row.alarm_minutes,
+      subscriptionCreatedAt: row.subscription_created_at ? new Date(row.subscription_created_at).toISOString() : null,
+      subscriptionUpdatedAt: row.subscription_updated_at ? new Date(row.subscription_updated_at).toISOString() : null
+    }
+  }))
+  const activeMembers = members.filter((member) => member.active)
+  const loggedInMembers = activeMembers.filter((member) => member.firstLoginAt)
+  const activeSince = now - 30 * 24 * 60 * 60 * 1000
+  const active30Days = activeMembers.filter((member) => member.lastActiveAt && Date.parse(member.lastActiveAt) >= activeSince).length
+  const subscribedMembers = activeMembers.filter((member) => member.subscribed).length
+  return context.json({
+    summary: {
+      activeMembers: activeMembers.length,
+      loggedInMembers: loggedInMembers.length,
+      active30Days,
+      subscribedMembers,
+      subscriptionRate: loggedInMembers.length ? Math.round(subscribedMembers / loggedInMembers.length * 1000) / 10 : 0
+    },
+    members
+  })
 })
 
 app.get('/v1/calendar-feed', requireAuth('member'), async (context) => {

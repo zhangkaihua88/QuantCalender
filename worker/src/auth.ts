@@ -62,8 +62,17 @@ export async function createSession(context: AppContext, role: Role, memberId: s
   const csrfToken = randomToken()
   const now = Date.now()
   const expiresAt = now + SESSION_SECONDS * 1000
-  await context.env.DB.prepare('INSERT INTO sessions (id, token_hash, csrf_hash, member_id, role, expires_at, created_at, last_seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)')
-    .bind(crypto.randomUUID(), await sessionTokenHash(context.env, token, role), await sha256(csrfToken), memberId, role, expiresAt, now).run()
+  const statements = [context.env.DB.prepare('INSERT INTO sessions (id, token_hash, csrf_hash, member_id, role, expires_at, created_at, last_seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)')
+    .bind(crypto.randomUUID(), await sessionTokenHash(context.env, token, role), await sha256(csrfToken), memberId, role, expiresAt, now)]
+  if (role === 'member' && memberId) {
+    statements.push(context.env.DB.prepare(`
+      INSERT INTO member_activity (member_id, first_login_at, last_login_at, last_active_at, login_count)
+      VALUES (?1, ?2, ?2, ?2, 1)
+      ON CONFLICT(member_id) DO UPDATE SET last_login_at = excluded.last_login_at,
+        last_active_at = excluded.last_active_at, login_count = member_activity.login_count + 1
+    `).bind(memberId, now))
+  }
+  await context.env.DB.batch(statements)
 
   const production = context.env.APP_ENV === 'production'
   setCookie(context, production ? '__Host-wq_session' : 'wq_session', token, {
@@ -92,7 +101,15 @@ export async function currentSession(context: AppContext): Promise<SessionRecord
   if (!row) return null
   if (row.role === 'member' && (!row.member_id || row.active !== 1)) return null
   if (now - row.last_seen_at > 5 * 60 * 1000) {
-    context.executionCtx.waitUntil(context.env.DB.prepare('UPDATE sessions SET last_seen_at = ?2 WHERE id = ?1').bind(row.id, now).run())
+    const statements = [context.env.DB.prepare('UPDATE sessions SET last_seen_at = ?2 WHERE id = ?1').bind(row.id, now)]
+    if (row.role === 'member' && row.member_id) {
+      statements.push(context.env.DB.prepare(`
+        INSERT INTO member_activity (member_id, first_login_at, last_login_at, last_active_at, login_count)
+        VALUES (?1, ?2, ?2, ?2, 1)
+        ON CONFLICT(member_id) DO UPDATE SET last_active_at = excluded.last_active_at
+      `).bind(row.member_id, now))
+    }
+    context.executionCtx.waitUntil(context.env.DB.batch(statements))
   }
   return row
 }

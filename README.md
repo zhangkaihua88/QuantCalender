@@ -38,7 +38,7 @@ node worker/scripts/hash-admin-password.mjs
 - `TURNSTILE_SECRET`
 - `SESSION_SECRET`
 
-会话令牌以带密钥的 HMAC-SHA-256 形式保存。轮换 `SESSION_SECRET` 会立即使全部旧会话失效；更新 `ADMIN_PASSWORD_HASH` 会立即使全部旧管理员会话失效。
+会话令牌以带密钥的 HMAC-SHA-256 形式保存。成员 WQ_ID 使用 `WQ_ID_HMAC_SECRET` 生成不可逆登录索引，并通过独立派生的 AES-GCM 密钥加密保存，供管理员查看成员登录、活跃和订阅统计。轮换 `WQ_ID_HMAC_SECRET` 会同时使现有成员登录索引和已加密 WQ_ID 失效，因此必须重新导入成员 CSV；轮换 `SESSION_SECRET` 会立即使全部旧会话失效，更新 `ADMIN_PASSWORD_HASH` 会立即使全部旧管理员会话失效。
 
 ## Cloudflare 部署
 
