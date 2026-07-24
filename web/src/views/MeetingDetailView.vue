@@ -49,7 +49,7 @@ function compact(value: string) { return new Date(value).toISOString().replace(/
           </dl>
         </section>
         <section class="card card-body">
-          <h2>下载到个人日历</h2><p class="fine-print">下载是单次快照。持续同步请在“提醒”页面生成私密订阅地址。</p>
+          <h2>下载到个人日历</h2><p class="fine-print">下载是单次快照。持续同步请在“设置”页面生成私密订阅地址。</p>
           <div class="field"><label for="alarm">提前提醒</label><select id="alarm" v-model="alarm"><option :value="0">不提醒</option><option :value="10">10 分钟</option><option :value="30">30 分钟</option><option :value="60">1 小时</option><option :value="1440">1 天</option></select></div>
           <a class="button secondary" style="margin-top:12px;width:100%" :href="`${API_BASE_URL}/v1/meetings/${meeting.id}.ics?alarm=${alarm}`"><CalendarPlus :size="17" />下载 .ics</a>
         </section>
