@@ -2,8 +2,6 @@
 
 面向中国大陆与香港成员的非官方会议日历。前端部署在 GitHub Pages，私密会议、成员名单和审批数据由 Cloudflare Worker + D1 保存。
 
-完整生产上线步骤请阅读：[DEPLOYMENT.md](DEPLOYMENT.md)。
-
 ## 项目结构
 
 - `web/`：Vue 3、TypeScript、Vite 前端
@@ -44,13 +42,13 @@ node worker/scripts/hash-admin-password.mjs
 
 ## Cloudflare 部署
 
-创建 D1、Cloudflare API Token、Worker Secrets 和 API 自定义域名的逐步说明见 [DEPLOYMENT.md](DEPLOYMENT.md)。
+创建 D1：`wrangler d1 create wq-meeting-calendar`。将返回的 `database_id` 配置为 GitHub Repository Variable `CLOUDFLARE_D1_DATABASE_ID`，并为 Worker 添加 API 自定义域名。
 
 30 天登录依赖同一主域名下的两个子域：前端 `calendar.<域名>`，API `api.calendar.<域名>`。API Cookie 使用 `HttpOnly + Secure + SameSite=Strict`，并额外校验 CSRF 和精确 Origin。
 
 ## GitHub Pages 部署
 
-GitHub Variables、Secrets、Pages 自定义域名和首次发布顺序见 [DEPLOYMENT.md](DEPLOYMENT.md)。
+在 GitHub Pages 中选择 GitHub Actions，并配置生产 API 地址、Turnstile Sitekey、前端来源和所需 Worker Secrets。
 
 ## 成员导入
 
