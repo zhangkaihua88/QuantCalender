@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Calendar, ChevronLeft, ChevronRight, List, Search } from 'lucide-vue-next'
+import { Calendar, ChevronLeft, ChevronRight, ExternalLink, Eye, List, Search } from 'lucide-vue-next'
 import type { MeetingOccurrence } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
 
@@ -38,7 +38,17 @@ const filtered = computed(() => occurrences.value.filter((item) => {
     && (!locationType.value || item.locationType === locationType.value)
 }))
 const upcoming = computed(() => filtered.value.find((item) => item.status === 'published' && new Date(item.endUtc).getTime() >= Date.now()))
-const agendaItems = computed(() => filtered.value.filter((item) => item !== upcoming.value))
+const agendaItems = computed(() => {
+  const shownSeries = new Set(upcoming.value ? [upcoming.value.eventId] : [])
+  return [...filtered.value]
+    .filter((item) => new Date(item.endUtc).getTime() >= Date.now())
+    .sort((left, right) => left.startUtc.localeCompare(right.startUtc))
+    .filter((item) => {
+      if (shownSeries.has(item.eventId)) return false
+      shownSeries.add(item.eventId)
+      return true
+    })
+})
 const categories = computed(() => [...new Set(occurrences.value.map((item) => item.category))].sort())
 
 function shanghaiParts(date: string) {
@@ -98,18 +108,25 @@ function detailLink(item: MeetingOccurrence) {
     <div v-else-if="filtered.length === 0" class="empty-state"><div><h2>暂时没有匹配的会议</h2><p>可以调整筛选条件，或提交一场新会议等待管理员审批。</p></div></div>
 
     <template v-else-if="view === 'agenda'">
-      <RouterLink v-if="upcoming" :to="detailLink(upcoming)" class="hero-meeting" style="text-decoration:none">
+      <section v-if="upcoming" class="hero-meeting">
         <div class="date-tile"><strong>{{ shanghaiParts(upcoming.startUtc).day }}</strong><span>{{ shanghaiParts(upcoming.startUtc).month }}月 · {{ shanghaiParts(upcoming.startUtc).weekday }}</span></div>
         <div><p class="eyebrow" style="color:#9ed3ce">NEXT MEETING · {{ timeFormatter.format(new Date(upcoming.startUtc)) }}</p><h2>{{ upcoming.title }}</h2><p>{{ upcoming.summary }} · {{ upcoming.organizer }}</p></div>
-        <span class="button">查看并注册</span>
-      </RouterLink>
+        <div class="hero-actions">
+          <RouterLink :to="detailLink(upcoming)" class="button secondary"><Eye :size="17" />查看详情</RouterLink>
+          <a class="button" :href="upcoming.registrationUrl" target="_blank" rel="noopener noreferrer"><ExternalLink :size="17" />立即注册</a>
+        </div>
+      </section>
       <div class="section-title"><h2>后续议程</h2><span class="muted">{{ agendaItems.length }} 场</span></div>
       <div class="agenda">
-        <RouterLink v-for="item in agendaItems" :key="`${item.eventId}-${item.occurrenceKey}`" :to="detailLink(item)" class="agenda-item" :class="{ cancelled: item.status === 'cancelled' }">
+        <article v-for="item in agendaItems" :key="`${item.eventId}-${item.occurrenceKey}`" class="agenda-item" :class="{ cancelled: item.status === 'cancelled' }">
           <div class="agenda-time">{{ timeFormatter.format(new Date(item.startUtc)) }}<span>{{ formatter.format(new Date(item.startUtc)) }}</span></div>
           <div><h3>{{ item.title }}</h3><p>{{ item.summary }} · {{ item.organizer }}</p></div>
           <div class="agenda-meta"><span class="tag">{{ item.category }}</span><span>{{ item.locationType === 'online' ? '线上' : item.locationType === 'offline' ? '线下' : '混合' }}</span><span v-if="item.status === 'cancelled'" class="status cancelled">已取消</span></div>
-        </RouterLink>
+          <div class="agenda-actions">
+            <RouterLink :to="detailLink(item)" class="button secondary"><Eye :size="16" />查看详情</RouterLink>
+            <a v-if="item.status !== 'cancelled'" class="button" :href="item.registrationUrl" target="_blank" rel="noopener noreferrer"><ExternalLink :size="16" />立即注册</a>
+          </div>
+        </article>
       </div>
     </template>
 
