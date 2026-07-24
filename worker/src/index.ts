@@ -5,6 +5,7 @@ import {
   calendarFeedSchema,
   decisionSchema,
   exceptionSchema,
+  identityPreferenceSchema,
   importRowsSchema,
   meetingInputSchema,
   memberLoginSchema
@@ -30,6 +31,8 @@ import { decryptWqId, encryptWqId, hmacSha256, normalizeWqId, randomToken, sha25
 import { audit, listEventExceptions, listPublishedEvents } from './db'
 import { expandEvent, normalizeMeetingTimes, publicEvent, type EventRow } from './events'
 import { buildCalendarIcs } from './ics'
+import { visibleMemberIdentity } from './identity'
+import { registerReplayRoutes } from './replays'
 
 type Variables = { session: SessionRecord }
 const app = new Hono<{ Bindings: Env; Variables: Variables }>()
@@ -52,7 +55,7 @@ app.use('*', async (context, next) => {
   await next()
 })
 
-app.get('/health', (context) => context.json({ status: 'ok', service: 'wq-meeting-calendar-api' }))
+app.get('/health', (context) => context.json({ status: 'ok', service: 'wq-meeting-calendar-api', features: ['replays-v1'] }))
 
 function sessionUser(session: SessionRecord) {
   return {
@@ -60,6 +63,7 @@ function sessionUser(session: SessionRecord) {
     memberId: session.member_id,
     wqIdHint: session.role === 'admin' ? '管理员' : (session.wq_id_hint || '成员'),
     country: session.country,
+    publicWqId: session.role === 'member' ? session.public_wq_id === 1 : null,
     expiresAt: new Date(session.expires_at).toISOString()
   }
 }
@@ -136,8 +140,8 @@ app.post('/v1/session/member', async (context) => {
     return apiError(context, 401, 'LOGIN_FAILED', 'WQ_ID 不存在或当前不可用')
   }
   const wqHash = await hmacSha256(wqId, context.env.WQ_ID_HMAC_SECRET)
-  const member = await context.env.DB.prepare("SELECT id, wq_id_hint, country FROM members WHERE wq_id_hash = ?1 AND active = 1 AND country IN ('CN', 'HK')")
-    .bind(wqHash).first<{ id: string; wq_id_hint: string; country: 'CN' | 'HK' }>()
+  const member = await context.env.DB.prepare("SELECT id, wq_id_hint, country, public_wq_id FROM members WHERE wq_id_hash = ?1 AND active = 1 AND country IN ('CN', 'HK')")
+    .bind(wqHash).first<{ id: string; wq_id_hint: string; country: 'CN' | 'HK'; public_wq_id: number }>()
   if (!member) {
     await recordLoginFailure(context.env, rateKey)
     return apiError(context, 401, 'LOGIN_FAILED', 'WQ_ID 不存在或当前不可用')
@@ -146,7 +150,7 @@ app.post('/v1/session/member', async (context) => {
   await context.env.DB.prepare('UPDATE members SET wq_id_ciphertext = COALESCE(wq_id_ciphertext, ?2), updated_at = ?3 WHERE id = ?1')
     .bind(member.id, await encryptWqId(wqId, context.env.WQ_ID_HMAC_SECRET), Date.now()).run()
   const created = await createSession(context, 'member', member.id)
-  return context.json({ user: { role: 'member', memberId: member.id, wqIdHint: member.wq_id_hint, country: member.country, expiresAt: new Date(created.expiresAt).toISOString() }, csrfToken: created.csrfToken })
+  return context.json({ user: { role: 'member', memberId: member.id, wqIdHint: member.wq_id_hint, country: member.country, publicWqId: member.public_wq_id === 1, expiresAt: new Date(created.expiresAt).toISOString() }, csrfToken: created.csrfToken })
 })
 
 app.post('/v1/session/admin', async (context) => {
@@ -166,10 +170,22 @@ app.post('/v1/session/admin', async (context) => {
   }
   await clearLoginFailures(context.env, rateKey)
   const created = await createSession(context, 'admin', null)
-  return context.json({ user: { role: 'admin', memberId: null, wqIdHint: '管理员', country: null, expiresAt: new Date(created.expiresAt).toISOString() }, csrfToken: created.csrfToken })
+  return context.json({ user: { role: 'admin', memberId: null, wqIdHint: '管理员', country: null, publicWqId: null, expiresAt: new Date(created.expiresAt).toISOString() }, csrfToken: created.csrfToken })
 })
 
 app.get('/v1/me', requireAuth(), (context) => context.json({ user: sessionUser(context.get('session')) }))
+
+app.patch('/v1/me/preferences', requireAuth('member'), async (context) => {
+  const session = context.get('session')
+  if (!await verifyMutation(context, session)) return apiError(context, 403, 'CSRF_FAILED', '安全校验失败')
+  const parsed = identityPreferenceSchema.safeParse(await readJson(context))
+  if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '身份显示设置无效')
+  await context.env.DB.prepare('UPDATE members SET public_wq_id = ?2, updated_at = ?3 WHERE id = ?1 AND active = 1')
+    .bind(session.member_id, parsed.data.publicWqId ? 1 : 0, Date.now()).run()
+  session.public_wq_id = parsed.data.publicWqId ? 1 : 0
+  await audit(context.env, session, 'update_identity_visibility', 'member', session.member_id!, { publicWqId: parsed.data.publicWqId })
+  return context.json({ user: sessionUser(session) })
+})
 
 app.get('/v1/session/csrf', requireAuth(), async (context) => {
   const csrfToken = await rotateCsrf(context, context.get('session'))
@@ -241,56 +257,77 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
     member_id: string
     wq_id_hint: string
     wq_id_ciphertext: string | null
+    public_wq_id: number
     country: 'CN' | 'HK'
     submission_count: number
     approved_count: number
+    contributed_meeting_count?: number
   }
-  type LeaderboardSummary = { contributor_count: number; submission_count: number; approved_count: number }
+  type LeaderboardSummary = { contributor_count: number; submission_count: number; approved_count: number; contributed_meeting_count?: number }
+  const kind = context.req.query('kind') || 'meeting'
+  if (!['meeting', 'replay'].includes(kind)) return apiError(context, 422, 'INVALID_LEADERBOARD_KIND', '排行榜类型无效')
   const requestedPage = Number(context.req.query('page') || 1)
   const requestedPageSize = Number(context.req.query('pageSize') || 50)
   const pageSize = [25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   const adminWqHash = await hmacSha256(normalizeWqId(context.env.ADMIN_WQ_ID), context.env.WQ_ID_HMAC_SECRET)
-  const summary = await context.env.DB.prepare(`
-    SELECT COUNT(DISTINCT e.submitter_member_id) AS contributor_count,
-      COUNT(*) AS submission_count,
-      COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
-    FROM events e
-    JOIN members m ON m.id = e.submitter_member_id
-    WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
-  `).bind(adminWqHash).first<LeaderboardSummary>()
+  const summary = kind === 'replay'
+    ? await context.env.DB.prepare(`
+        SELECT COUNT(DISTINCT rl.submitter_member_id) AS contributor_count,
+          COUNT(*) AS submission_count,
+          COALESCE(SUM(CASE WHEN rl.approved_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count,
+          COUNT(DISTINCT CASE WHEN rl.approved_at IS NOT NULL THEN rl.group_id END) AS contributed_meeting_count
+        FROM replay_links rl
+        JOIN members m ON m.id = rl.submitter_member_id
+        WHERE rl.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+      `).bind(adminWqHash).first<LeaderboardSummary>()
+    : await context.env.DB.prepare(`
+        SELECT COUNT(DISTINCT e.submitter_member_id) AS contributor_count,
+          COUNT(*) AS submission_count,
+          COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+        FROM events e
+        JOIN members m ON m.id = e.submitter_member_id
+        WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+      `).bind(adminWqHash).first<LeaderboardSummary>()
   const total = summary?.contributor_count || 0
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, Number.isFinite(requestedPage) ? Math.trunc(requestedPage) : 1), totalPages)
   const offset = (page - 1) * pageSize
-  const result = await context.env.DB.prepare(`
-    SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.country,
-      COUNT(e.id) AS submission_count,
-      COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
-    FROM events e
-    JOIN members m ON m.id = e.submitter_member_id
-    WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
-    GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.country
-    ORDER BY approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
-    LIMIT ?2 OFFSET ?3
-  `).bind(adminWqHash, pageSize, offset).all<LeaderboardRow>()
+  const result = kind === 'replay'
+    ? await context.env.DB.prepare(`
+        SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
+          COUNT(rl.id) AS submission_count,
+          COALESCE(SUM(CASE WHEN rl.approved_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count,
+          COUNT(DISTINCT CASE WHEN rl.approved_at IS NOT NULL THEN rl.group_id END) AS contributed_meeting_count
+        FROM replay_links rl
+        JOIN members m ON m.id = rl.submitter_member_id
+        WHERE rl.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+        GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
+        ORDER BY contributed_meeting_count DESC, approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
+        LIMIT ?2 OFFSET ?3
+      `).bind(adminWqHash, pageSize, offset).all<LeaderboardRow>()
+    : await context.env.DB.prepare(`
+        SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
+          COUNT(e.id) AS submission_count,
+          COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+        FROM events e
+        JOIN members m ON m.id = e.submitter_member_id
+        WHERE e.submitter_member_id IS NOT NULL AND m.active = 1 AND m.wq_id_hash <> ?1
+        GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
+        ORDER BY approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
+        LIMIT ?2 OFFSET ?3
+      `).bind(adminWqHash, pageSize, offset).all<LeaderboardRow>()
   const session = context.get('session')
   const entries = await Promise.all(result.results.map(async (row, index) => {
-    let wqId = row.wq_id_hint
-    let hasFullWqId = false
-    if (session.role === 'admin' && row.wq_id_ciphertext) {
-      try {
-        wqId = await decryptWqId(row.wq_id_ciphertext, context.env.WQ_ID_HMAC_SECRET)
-        hasFullWqId = true
-      } catch { /* Keep the non-sensitive hint when ciphertext cannot be decrypted. */ }
-    }
+    const identity = await visibleMemberIdentity(row, context.env, session.role)
     return {
       rank: offset + index + 1,
       memberId: row.member_id,
-      wqId,
-      hasFullWqId,
+      wqId: identity.wqId,
+      hasFullWqId: identity.hasFullWqId,
       country: row.country,
       submissionCount: row.submission_count,
       approvedCount: row.approved_count,
+      ...(kind === 'replay' ? { contributedMeetingCount: row.contributed_meeting_count || 0 } : {}),
       approvalRate: row.submission_count ? Math.round(row.approved_count / row.submission_count * 1000) / 10 : 0,
       isCurrentUser: session.role === 'member' && session.member_id === row.member_id
     }
@@ -298,10 +335,12 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
   const submissionCount = summary?.submission_count || 0
   const approvedCount = summary?.approved_count || 0
   return context.json({
+    kind,
     summary: {
       contributorCount: total,
       submissionCount,
       approvedCount,
+      ...(kind === 'replay' ? { contributedMeetingCount: summary?.contributed_meeting_count || 0 } : {}),
       approvalRate: submissionCount ? Math.round(approvedCount / submissionCount * 1000) / 10 : 0
     },
     pagination: { page, pageSize, total, totalPages },
@@ -695,6 +734,8 @@ app.get('/ics/:token/calendar.ics', async (context) => {
   context.header('Cache-Control', 'private, max-age=300')
   return context.body(buildCalendarIcs(relevantEvents, relevantExceptions, token.alarm_minutes))
 })
+
+registerReplayRoutes(app)
 
 app.get('/v1/admin/audit', requireAuth('admin'), async (context) => {
   const result = await context.env.DB.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 200').all()

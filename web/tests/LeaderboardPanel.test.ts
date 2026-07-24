@@ -21,13 +21,28 @@ describe('LeaderboardPanel', () => {
   })
 
   it('renders submission and approval rankings with the current member marked', async () => {
-    const wrapper = mount(LeaderboardPanel)
+    const wrapper = mount(LeaderboardPanel, { global: { stubs: { RouterLink: { template:'<a><slot /></a>' } } } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('投稿总数')
-    expect(wrapper.text()).toContain('通过总数')
+    expect(wrapper.text()).toContain('会议投稿')
+    expect(wrapper.text()).toContain('通过会议')
     expect(wrapper.text()).toContain('••••1234')
     expect(wrapper.text()).toContain('通过 4 次')
     expect(wrapper.find('.current-user-row').text()).toContain('我')
+  })
+
+  it('loads a separate replay ranking ordered around contributed meetings', async () => {
+    const wrapper = mount(LeaderboardPanel, { global: { stubs: { RouterLink: { template:'<a><slot /></a>' } } } })
+    await flushPromises()
+    vi.mocked(api).mockResolvedValueOnce({
+      summary: { contributorCount:1, submissionCount:3, approvedCount:2, contributedMeetingCount:1, approvalRate:66.7 },
+      pagination: { page:1, pageSize:50, total:1, totalPages:1 },
+      entries: [{ rank:1, memberId:'member-1', wqId:'KZ12345', hasFullWqId:true, country:'CN', submissionCount:3, approvedCount:2, contributedMeetingCount:1, approvalRate:66.7, isCurrentUser:true }]
+    })
+    await wrapper.findAll('.leaderboard-switch button')[1]!.trigger('click')
+    await flushPromises()
+    expect(vi.mocked(api).mock.calls.at(-1)?.[0]).toContain('kind=replay')
+    expect(wrapper.text()).toContain('贡献会议')
+    expect(wrapper.text()).toContain('贡献 1 场会议')
   })
 })

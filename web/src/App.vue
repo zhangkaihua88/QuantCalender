@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarDays, CircleHelp, ClipboardPlus, Github, LogOut, Settings, ShieldCheck, Trophy } from 'lucide-vue-next'
+import { CalendarDays, CircleHelp, ClipboardPlus, Github, LogOut, PlayCircle, Settings, ShieldCheck, Trophy } from 'lucide-vue-next'
 import { logout, session } from './state'
 
 const route = useRoute()
@@ -26,8 +26,9 @@ async function signOut() {
       </RouterLink>
       <nav class="main-nav" aria-label="主导航">
         <RouterLink to="/"><CalendarDays :size="18" />日历</RouterLink>
+        <RouterLink to="/replays"><PlayCircle :size="18" />回放</RouterLink>
         <RouterLink v-if="session.user?.role === 'member'" to="/submit"><ClipboardPlus :size="18" />投稿</RouterLink>
-        <RouterLink v-if="session.user?.role === 'member'" to="/calendar-settings"><Settings :size="18" />提醒</RouterLink>
+        <RouterLink v-if="session.user?.role === 'member'" to="/calendar-settings"><Settings :size="18" />设置</RouterLink>
         <RouterLink to="/leaderboard"><Trophy :size="18" />排行</RouterLink>
         <RouterLink v-if="session.user?.role === 'admin'" to="/admin"><ShieldCheck :size="18" />管理</RouterLink>
         <RouterLink to="/guide"><CircleHelp :size="18" />指南</RouterLink>

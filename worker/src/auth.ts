@@ -93,7 +93,7 @@ export async function currentSession(context: AppContext): Promise<SessionRecord
   const memberHash = await sessionTokenHash(context.env, token, 'member')
   const adminHash = await sessionTokenHash(context.env, token, 'admin')
   const row = await context.env.DB.prepare(`
-    SELECT s.*, m.wq_id_hint, m.country, m.active
+    SELECT s.*, m.wq_id_hint, m.country, m.active, m.public_wq_id
     FROM sessions s
     LEFT JOIN members m ON m.id = s.member_id
     WHERE s.token_hash IN (?1, ?2) AND s.expires_at > ?3

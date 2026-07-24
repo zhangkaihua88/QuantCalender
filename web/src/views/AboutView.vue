@@ -15,14 +15,18 @@
         <RouterLink class="button" to="/submit">提交会议</RouterLink>
         <RouterLink class="button secondary" to="/submissions">查看我的投稿</RouterLink>
       </div>
+
+      <h2>4. 分享会议回放</h2>
+      <p>进入“回放”可浏览已审核的网盘来源。投稿时可以关联日历里的具体会议，也可以手动填写历史会议；同一场会议允许不同成员补充多个来源。若链接或提取码失效，可在来源旁提交反馈。</p>
+      <RouterLink class="button secondary" to="/replays">浏览与投稿回放</RouterLink>
     </section>
 
     <aside class="stack">
       <section class="card card-body detail-copy">
-        <h2>4. 设置日历提醒</h2>
+        <h2>5. 设置提醒与身份显示</h2>
         <p>进入“提醒”，选择不提醒、提前 10 分钟、30 分钟、1 小时或 1 天，然后生成个人订阅地址，并在 Google、Outlook 或 Apple Calendar 中通过 URL 添加订阅。</p>
         <p>订阅地址属于个人访问凭证，请勿转发。旋转或撤销后，旧地址会立即失效。</p>
-        <RouterLink class="button secondary" to="/calendar-settings">设置提醒</RouterLink>
+        <p>完整 WQ_ID 默认会显示在排行榜和回放贡献者位置；如需隐藏，可在设置中切换为仅显示末四位。</p><RouterLink class="button secondary" to="/calendar-settings">打开成员设置</RouterLink>
       </section>
 
       <section class="card card-body detail-copy">

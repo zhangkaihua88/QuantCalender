@@ -24,4 +24,5 @@ export interface SessionRecord {
   wq_id_hint: string | null
   country: 'CN' | 'HK' | null
   active: number | null
+  public_wq_id: number | null
 }

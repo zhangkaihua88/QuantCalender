@@ -22,6 +22,12 @@ const safeHttpsUrl = z.string().url().max(2048).refine((value) => {
   }
 }, '仅支持不包含账号密码的 HTTPS 链接')
 
+const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式必须为 YYYY-MM-DD').refine((value) => {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year!, month! - 1, day!))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
+}, '会议日期无效')
+
 export const meetingInputSchema = z.object({
   title: z.string().trim().min(2).max(120),
   category: z.string().trim().min(1).max(48),
@@ -76,10 +82,53 @@ export const calendarFeedSchema = z.object({
   alarmMinutes: z.union([z.literal(0), z.literal(10), z.literal(30), z.literal(60), z.literal(1440)]).default(30)
 })
 
+export const replayStatusSchema = z.enum(['pending', 'published', 'rejected', 'disabled'])
+export const replayProviderSchema = z.enum(['baidu', 'quark', 'aliyun', 'onedrive', 'google_drive', 'dropbox', 'weiyun', 'other'])
+
+export const replayInputSchema = z.object({
+  groupId: z.string().uuid().nullable().default(null),
+  eventId: z.string().uuid().nullable().default(null),
+  occurrenceKey: z.string().datetime().nullable().default(null),
+  title: z.string().trim().min(2).max(120),
+  meetingDate: calendarDateSchema,
+  shareUrl: safeHttpsUrl,
+  accessCode: z.string().trim().max(64).default(''),
+  note: z.string().trim().max(500).default('')
+}).superRefine((value, context) => {
+  if (Boolean(value.eventId) !== Boolean(value.occurrenceKey)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['eventId'], message: '关联会议和具体场次必须同时提供' })
+  }
+})
+
+export const replayAdminUpdateSchema = z.object({
+  targetGroupId: z.string().uuid().nullable().default(null),
+  title: z.string().trim().min(2).max(120),
+  meetingDate: calendarDateSchema,
+  shareUrl: safeHttpsUrl,
+  accessCode: z.string().trim().max(64).default(''),
+  note: z.string().trim().max(500).default('')
+})
+
+export const replayReportSchema = z.object({
+  reason: z.enum(['unavailable', 'invalid_code', 'content_mismatch', 'other']),
+  note: z.string().trim().max(300).default('')
+})
+
+export const replayReportResolutionSchema = z.object({
+  resolution: z.enum(['resolved', 'dismissed'])
+})
+
+export const identityPreferenceSchema = z.object({
+  publicWqId: z.boolean()
+})
+
 export type MeetingInput = z.infer<typeof meetingInputSchema>
 export type EventStatus = z.infer<typeof eventStatusSchema>
 export type Recurrence = z.infer<typeof recurrenceSchema>
 export type MemberImportRow = z.infer<typeof memberImportRowSchema>
+export type ReplayInput = z.infer<typeof replayInputSchema>
+export type ReplayStatus = z.infer<typeof replayStatusSchema>
+export type ReplayProvider = z.infer<typeof replayProviderSchema>
 
 export interface MeetingOccurrence {
   eventId: string
@@ -112,11 +161,54 @@ export interface LeaderboardEntry {
   isCurrentUser: boolean
 }
 
+export interface ReplayLeaderboardEntry extends LeaderboardEntry {
+  contributedMeetingCount: number
+}
+
+export interface ReplayLink {
+  id: string
+  provider: ReplayProvider
+  providerLabel: string
+  shareUrl: string
+  accessCode: string
+  note: string
+  contributorWqId: string
+  contributorHasFullWqId: boolean
+  openReportCount: number
+  reportedByMe: boolean
+}
+
+export interface ReplayGroup {
+  id: string
+  eventId: string | null
+  occurrenceKey: string | null
+  title: string
+  meetingDate: string
+  links: ReplayLink[]
+}
+
+export interface ReplaySubmission {
+  id: string
+  groupId: string
+  title: string
+  meetingDate: string
+  provider: ReplayProvider
+  providerLabel: string
+  shareUrl: string
+  accessCode: string
+  note: string
+  status: ReplayStatus
+  reviewNote: string
+  createdAt: string
+  approvedAt: string | null
+}
+
 export interface SessionUser {
   role: 'member' | 'admin'
   memberId: string | null
   wqIdHint: string
   country: 'CN' | 'HK' | null
+  publicWqId: boolean | null
   expiresAt: string
 }
 

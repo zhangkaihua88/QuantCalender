@@ -9,6 +9,8 @@ import CalendarSettingsView from './views/CalendarSettingsView.vue'
 import AdminView from './views/AdminView.vue'
 import AboutView from './views/AboutView.vue'
 import LeaderboardView from './views/LeaderboardView.vue'
+import ReplaysView from './views/ReplaysView.vue'
+import ReplaySubmitView from './views/ReplaySubmitView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -16,6 +18,8 @@ const router = createRouter({
     { path: '/login', component: LoginView, meta: { public: true } },
     { path: '/', component: CalendarView },
     { path: '/meetings/:id', component: MeetingDetailView },
+    { path: '/replays', component: ReplaysView },
+    { path: '/replays/submit', component: ReplaySubmitView, meta: { member: true } },
     { path: '/submit', component: SubmitView, meta: { member: true } },
     { path: '/submissions', component: MySubmissionsView, meta: { member: true } },
     { path: '/calendar-settings', component: CalendarSettingsView, meta: { member: true } },
