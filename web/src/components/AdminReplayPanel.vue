@@ -13,7 +13,10 @@ type Entry = {
 type Pagination = { page:number; pageSize:number; total:number; totalPages:number }
 type Draft = { title:string; meetingDate:string; shareUrl:string; accessCode:string; note:string; targetGroupId:string }
 
-const filter = ref<Filter>('pending')
+const props = withDefaults(defineProps<{ pendingOnly?: boolean }>(), { pendingOnly:false })
+const emit = defineEmits<{ pendingCount:[count:number] }>()
+
+const filter = ref<Filter>(props.pendingOnly ? 'pending' : 'published')
 const entries = ref<Entry[]>([])
 const pagination = ref<Pagination>({ page:1, pageSize:25, total:0, totalPages:1 })
 const pageSize = ref(25)
@@ -37,6 +40,7 @@ async function load(page = pagination.value.page) {
     const data = await api<{ entries:Entry[]; pagination:Pagination }>(`/v1/admin/replays?filter=${filter.value}&page=${page}&pageSize=${pageSize.value}`)
     entries.value = data.entries
     pagination.value = data.pagination
+    if (filter.value === 'pending') emit('pendingCount', data.pagination.total)
     for (const item of data.entries) {
       drafts[item.id] = { title:item.title, meetingDate:item.meetingDate, shareUrl:item.shareUrl, accessCode:item.accessCode, note:item.note, targetGroupId:'' }
       reviewNotes[item.id] = item.reviewNote || ''
@@ -89,14 +93,16 @@ async function mergeGroups() {
 </script>
 
 <template>
-  <div class="stack">
+  <div class="stack" :class="{ 'admin-replay-pending-embed': pendingOnly }">
     <div v-if="error" class="error-box">{{ error }}</div><div v-if="notice" class="success-box">{{ notice }}</div>
-    <div class="section-title"><div><h2>回放管理</h2><p class="fine-print">审批成员来源、处理失效反馈，或由管理员直接发布回放。</p></div><div class="inline"><button class="button secondary small" @click="load()"><RefreshCw :size="15" />刷新</button><button class="button small" @click="createOpen=!createOpen"><Plus :size="15" />直接新增</button></div></div>
-    <form v-if="createOpen" class="card card-body stack" @submit.prevent="createReplay"><h3>管理员直接发布回放</h3><div class="form-grid"><div class="field wide"><label>会议标题 *</label><input v-model="createForm.title" required maxlength="120" /></div><div class="field"><label>会议日期 *</label><input v-model="createForm.meetingDate" required type="date" /></div><div class="field"><label>提取码</label><input v-model="createForm.accessCode" maxlength="64" /></div><div class="field wide"><label>回放链接 *</label><input v-model="createForm.shareUrl" required type="url" /></div><div class="field wide"><label>备注</label><textarea v-model="createForm.note" maxlength="500" /></div></div><div class="inline"><button class="button" type="submit">发布回放</button><button class="button secondary" type="button" @click="createOpen=false">取消</button></div></form>
-    <section class="card card-body"><h3>合并重复会议卡片</h3><p class="fine-print">卡片 ID 显示在每条回放标题下。合并会移动来源链接并删除空的来源卡片。</p><div class="inline"><input v-model="mergeSourceId" aria-label="来源卡片 ID" placeholder="来源卡片 ID" /><input v-model="mergeTargetId" aria-label="目标卡片 ID" placeholder="目标卡片 ID" /><button class="button secondary small" @click="mergeGroups">合并</button></div></section>
-    <div class="tabs replay-admin-tabs"><button v-for="item in [{id:'pending',label:'待审核'},{id:'published',label:'已发布'},{id:'reports',label:'失效反馈'},{id:'disabled',label:'已下架'},{id:'rejected',label:'已拒绝'}]" :key="item.id" :class="{active:filter===item.id}" @click="switchFilter(item.id as Filter)">{{ item.label }}</button></div>
+    <template v-if="!pendingOnly">
+      <div class="section-title"><div><h2>回放管理</h2><p class="fine-print">维护已发布来源、处理失效反馈，或由管理员直接发布回放。</p></div><div class="inline"><button class="button secondary small" @click="load()"><RefreshCw :size="15" />刷新</button><button class="button small" @click="createOpen=!createOpen"><Plus :size="15" />直接新增</button></div></div>
+      <form v-if="createOpen" class="card card-body stack" @submit.prevent="createReplay"><h3>管理员直接发布回放</h3><div class="form-grid"><div class="field wide"><label>会议标题 *</label><input v-model="createForm.title" required maxlength="120" /></div><div class="field"><label>会议日期 *</label><input v-model="createForm.meetingDate" required type="date" /></div><div class="field"><label>提取码</label><input v-model="createForm.accessCode" maxlength="64" /></div><div class="field wide"><label>回放链接 *</label><input v-model="createForm.shareUrl" required type="url" /></div><div class="field wide"><label>备注</label><textarea v-model="createForm.note" maxlength="500" /></div></div><div class="inline"><button class="button" type="submit">发布回放</button><button class="button secondary" type="button" @click="createOpen=false">取消</button></div></form>
+      <section class="card card-body"><h3>合并重复会议卡片</h3><p class="fine-print">卡片 ID 显示在每条回放标题下。合并会移动来源链接并删除空的来源卡片。</p><div class="inline"><input v-model="mergeSourceId" aria-label="来源卡片 ID" placeholder="来源卡片 ID" /><input v-model="mergeTargetId" aria-label="目标卡片 ID" placeholder="目标卡片 ID" /><button class="button secondary small" @click="mergeGroups">合并</button></div></section>
+      <div class="tabs replay-admin-tabs"><button v-for="item in [{id:'published',label:'已发布'},{id:'reports',label:'失效反馈'},{id:'disabled',label:'已下架'},{id:'rejected',label:'已拒绝'}]" :key="item.id" :class="{active:filter===item.id}" @click="switchFilter(item.id as Filter)">{{ item.label }}</button></div>
+    </template>
     <div v-if="loading" class="empty-state">正在加载回放管理数据…</div>
-    <div v-else-if="!entries.length" class="empty-state">当前分类没有回放记录。</div>
+    <div v-else-if="!entries.length" class="empty-state">{{ pendingOnly ? '当前没有待审核的回放投稿。' : '当前分类没有回放记录。' }}</div>
     <div v-else class="stack">
       <article v-for="item in entries" :key="item.id" class="card card-body replay-admin-card">
         <div class="section-title replay-admin-head"><div><span class="status" :class="item.status">{{ item.status }}</span><h3>{{ item.title }}</h3><p class="fine-print">会议卡片 ID：{{ item.groupId }} · 投稿人：{{ item.contributorWqId }} · {{ new Date(item.createdAt).toLocaleString('zh-CN') }}</p></div><a class="button secondary small" :href="item.shareUrl" target="_blank" rel="noopener noreferrer"><ExternalLink :size="15" />检查链接</a></div>

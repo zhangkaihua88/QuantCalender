@@ -129,6 +129,13 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .day-number { display: inline-grid; place-items: center; width: 28px; height: 28px; font-size: 12px; font-weight: 800; }
 .day-number.today { color: white; border-radius: 50%; background: var(--teal); }
 .calendar-chip { display: block; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; margin-top: 5px; padding: 5px 7px; color: var(--teal-dark); border-left: 3px solid var(--teal); border-radius: 5px; background: var(--teal-soft); font-size: 11px; font-weight: 700; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.meeting-submit-dialog { width: min(820px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; }
+.meeting-submit-dialog-head { align-items: flex-start; margin-top: 0; }
+.meeting-submit-dialog-head h2 { margin-bottom: 7px; }
+.meeting-submit-dialog-head .icon-button { flex: 0 0 40px; }
+.meeting-submit-error { margin-bottom: 16px; }
+.meeting-submit-success { display: grid; gap: 16px; }
 
 .detail-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(290px, .55fr); gap: 22px; }
 .detail-copy { color: #435765; white-space: pre-wrap; line-height: 1.8; }
@@ -215,6 +222,19 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .replay-admin-actions { margin-top: 14px; }
 .replay-admin-tabs { margin-bottom: 0; }
 .replay-admin-card input, .replay-admin-card textarea, .replay-admin-card select, .pagination-bar select, .card .inline > input { min-height: 42px; padding: 8px 11px; color: var(--ink); border: 1px solid #cfd5d2; border-radius: 10px; background: white; }
+.pending-review-layout { display: grid; gap: 30px; }
+.pending-review-group { display: grid; gap: 14px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,253,248,.58); }
+.pending-review-title { display: flex; align-items: center; gap: 12px; }
+.pending-review-title h2, .pending-review-title p { margin: 0; }
+.pending-review-title p { margin-top: 3px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.pending-review-icon { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 42px; border-radius: 12px; }
+.pending-review-meetings { border-top: 4px solid #315f87; }
+.pending-review-meetings .pending-review-icon { color: #244e73; background: #dce8f2; }
+.pending-review-meetings .pending-review-card { border-left: 4px solid #315f87; }
+.pending-review-replays { border-top: 4px solid var(--teal); }
+.pending-review-replays .pending-review-icon { color: var(--teal-dark); background: var(--teal-soft); }
+.pending-review-replays .replay-admin-card { border-left: 4px solid var(--teal); }
+.admin-replay-pending-embed .empty-state { min-height: 150px; background: var(--paper); }
 
 .login-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(400px, .92fr); }
 .login-story { min-height: 100vh; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(32px, 6vw, 74px); color: white; background: linear-gradient(145deg, #17324d 0%, #164f5c 62%, #177c78 100%); position: relative; overflow: hidden; }
@@ -256,6 +276,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
   .main-nav a svg { display: none; }
   .page-container { width: min(100% - 28px, 1240px); padding-top: 27px; }
   .page-head { align-items: flex-start; flex-direction: column; }
+  .calendar-page-actions { width: 100%; justify-content: space-between; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
   .filters { grid-template-columns: 1fr 1fr; }
@@ -280,6 +301,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
   .replay-search { grid-column: 1 / -1; }
   .replay-source { grid-template-columns: 1fr; }
   .replay-source-actions { justify-content: flex-start; }
+  .pending-review-group { padding: 16px; }
 }
 
 @media (max-width: 460px) {
@@ -289,6 +311,9 @@ h3 { margin-bottom: 8px; font-size: 17px; }
   .hero-meeting { grid-template-columns: 1fr; }
   .hero-actions { width: 100%; }
   .hero-actions .button { flex: 1; }
+  .calendar-page-actions { align-items: stretch; flex-direction: column; }
+  .calendar-page-actions .meeting-submit-button, .calendar-page-actions .segmented { width: 100%; }
+  .calendar-page-actions .segmented button { flex: 1; }
   .agenda-actions { width: 100%; }
   .agenda-actions .button { flex: 1; }
   .date-tile { justify-self: start; min-height: auto; grid-auto-flow: column; gap: 8px; padding: 9px 13px; }

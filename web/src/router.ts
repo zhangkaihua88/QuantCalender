@@ -3,7 +3,6 @@ import { bootstrapSession, session } from './state'
 import LoginView from './views/LoginView.vue'
 import CalendarView from './views/CalendarView.vue'
 import MeetingDetailView from './views/MeetingDetailView.vue'
-import SubmitView from './views/SubmitView.vue'
 import MySubmissionsView from './views/MySubmissionsView.vue'
 import CalendarSettingsView from './views/CalendarSettingsView.vue'
 import AdminView from './views/AdminView.vue'
@@ -20,7 +19,7 @@ const router = createRouter({
     { path: '/meetings/:id', component: MeetingDetailView },
     { path: '/replays', component: ReplaysView },
     { path: '/replays/submit', component: ReplaySubmitView, meta: { member: true } },
-    { path: '/submit', component: SubmitView, meta: { member: true } },
+    { path: '/submit', redirect: { path: '/', query: { submit: '1' } } },
     { path: '/submissions', component: MySubmissionsView, meta: { member: true } },
     { path: '/calendar-settings', component: CalendarSettingsView, meta: { member: true } },
     { path: '/leaderboard', component: LeaderboardView },

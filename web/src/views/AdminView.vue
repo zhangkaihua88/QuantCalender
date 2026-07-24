@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { FileUp, Pencil, Plus, ShieldX, XCircle } from 'lucide-vue-next'
+import { CalendarDays, FileUp, Pencil, PlaySquare, Plus, ShieldX, XCircle } from 'lucide-vue-next'
 import type { MeetingInput, MeetingOccurrence } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
 import { session } from '../state'
@@ -22,6 +22,7 @@ type UsagePagination = { page: number; pageSize: number; total: number; totalPag
 const router = useRouter()
 const tab = ref<Tab>('pending')
 const pending = ref<any[]>([])
+const pendingReplayCount = ref(0)
 const events = ref<any[]>([])
 const occurrences = ref<MeetingOccurrence[]>([])
 const logs = ref<any[]>([])
@@ -219,20 +220,27 @@ async function revokeAllAdminSessions() {
   <div class="page-head"><div><p class="eyebrow">ADMIN CONSOLE</p><h1>日历管理</h1><p class="subtitle">审批成员投稿、维护会议系列和更新 CN/HK 成员名单。所有关键操作都会写入审计日志。</p></div><button class="button" @click="createEvent"><Plus :size="17" />新建会议</button></div>
   <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div><div v-if="notice" class="success-box" style="margin-bottom:14px">{{ notice }}</div>
 
-  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">会议待审 {{ pending.length }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='replays'}" @click="tab='replays'">回放管理</button><button :class="{active:tab==='leaderboard'}" @click="tab='leaderboard'">投稿排行</button><button :class="{active:tab==='usage'}" @click="openUsage">使用统计</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
+  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">待审 {{ pending.length + pendingReplayCount }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='replays'}" @click="tab='replays'">回放管理</button><button :class="{active:tab==='leaderboard'}" @click="tab='leaderboard'">投稿排行</button><button :class="{active:tab==='usage'}" @click="openUsage">使用统计</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
 
   <section v-if="editorOpen" class="card card-body" style="margin-bottom:22px"><div class="section-title"><h2>{{ editing ? '编辑会议' : '创建会议' }}</h2><button class="icon-button" @click="editorOpen=false"><XCircle :size="19" /></button></div><div v-if="!editing || editing.status === 'draft'" class="field" style="max-width:280px;margin-bottom:16px"><label for="editor-status">保存状态</label><select id="editor-status" v-model="editorStatus"><option value="draft">保存为草稿</option><option value="published">立即发布</option></select></div><MeetingForm :initial="editing ? meetingFromEvent(editing) : undefined" :busy="busy" :submit-label="editing ? '保存修改' : editorStatus === 'draft' ? '保存草稿' : '发布会议'" @submit="saveEvent" /></section>
 
-  <section v-if="tab==='pending'">
-    <div v-if="!pending.length" class="empty-state">当前没有待审核投稿。</div>
-    <div v-else class="stack">
-      <article v-for="item in pending" :key="item.id" class="card card-body">
-        <div class="page-head" style="margin-bottom:14px"><div><span class="status pending">待审核</span><h2 style="margin-top:10px">{{ item.title }}</h2><p class="subtitle">{{ item.summary }}</p></div><button class="button secondary small" @click="editEvent(item)"><Pencil :size="15" />审核前编辑</button></div>
-        <dl class="meta-list"><div class="meta-row"><dt>时间</dt><dd>{{ item.startLocal }} · {{ item.sourceTimezone }}</dd></div><div class="meta-row"><dt>主办方</dt><dd>{{ item.organizer }}</dd></div><div class="meta-row"><dt>注册链接</dt><dd><a :href="item.registrationUrl" target="_blank" rel="noopener noreferrer">{{ hostname(item.registrationUrl) }}</a></dd></div></dl>
-        <div class="field" style="margin-top:14px"><label>给投稿人的反馈（可选）</label><textarea v-model="reviewNotes[item.id]" maxlength="1000" /></div>
-        <div class="inline" style="margin-top:12px"><button class="button" @click="decide(item.id,'publish')">通过并发布</button><button class="button danger" @click="decide(item.id,'reject')">拒绝</button></div>
-      </article>
-    </div>
+  <section v-if="tab==='pending'" class="pending-review-layout">
+    <section class="pending-review-group pending-review-meetings">
+      <div class="pending-review-title"><span class="pending-review-icon"><CalendarDays :size="19" /></span><div><h2>会议投稿</h2><p>待审核 {{ pending.length }} 条</p></div></div>
+      <div v-if="!pending.length" class="empty-state">当前没有待审核的会议投稿。</div>
+      <div v-else class="stack">
+        <article v-for="item in pending" :key="item.id" class="card card-body pending-review-card">
+          <div class="page-head" style="margin-bottom:14px"><div><span class="status pending">会议待审</span><h2 style="margin-top:10px">{{ item.title }}</h2><p class="subtitle">{{ item.summary }}</p></div><button class="button secondary small" @click="editEvent(item)"><Pencil :size="15" />审核前编辑</button></div>
+          <dl class="meta-list"><div class="meta-row"><dt>时间</dt><dd>{{ item.startLocal }} · {{ item.sourceTimezone }}</dd></div><div class="meta-row"><dt>主办方</dt><dd>{{ item.organizer }}</dd></div><div class="meta-row"><dt>注册链接</dt><dd><a :href="item.registrationUrl" target="_blank" rel="noopener noreferrer">{{ hostname(item.registrationUrl) }}</a></dd></div></dl>
+          <div class="field" style="margin-top:14px"><label>给投稿人的反馈（可选）</label><textarea v-model="reviewNotes[item.id]" maxlength="1000" /></div>
+          <div class="inline" style="margin-top:12px"><button class="button" @click="decide(item.id,'publish')">通过并发布</button><button class="button danger" @click="decide(item.id,'reject')">拒绝</button></div>
+        </article>
+      </div>
+    </section>
+    <section class="pending-review-group pending-review-replays">
+      <div class="pending-review-title"><span class="pending-review-icon"><PlaySquare :size="19" /></span><div><h2>回放投稿</h2><p>待审核 {{ pendingReplayCount }} 条</p></div></div>
+      <AdminReplayPanel pending-only @pending-count="pendingReplayCount = $event" />
+    </section>
   </section>
 
   <section v-if="tab==='events'" class="stack">

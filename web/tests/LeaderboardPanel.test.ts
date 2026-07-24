@@ -14,8 +14,8 @@ describe('LeaderboardPanel', () => {
       summary: { contributorCount: 2, submissionCount: 8, approvedCount: 5, approvalRate: 62.5 },
       pagination: { page: 1, pageSize: 50, total: 2, totalPages: 1 },
       entries: [
-        { rank: 1, memberId: 'member-1', wqId: '••••1234', hasFullWqId: false, country: 'CN', submissionCount: 5, approvedCount: 4, approvalRate: 80, isCurrentUser: true },
-        { rank: 2, memberId: 'member-2', wqId: '••••5678', hasFullWqId: false, country: 'HK', submissionCount: 3, approvedCount: 1, approvalRate: 33.3, isCurrentUser: false }
+        { rank: 1, memberId: 'member-1', wqId: 'KZ', hasFullWqId: false, country: 'CN', submissionCount: 5, approvedCount: 4, approvalRate: 80, isCurrentUser: true },
+        { rank: 2, memberId: 'member-2', wqId: 'AB', hasFullWqId: false, country: 'HK', submissionCount: 3, approvedCount: 1, approvalRate: 33.3, isCurrentUser: false }
       ]
     })
   })
@@ -26,7 +26,8 @@ describe('LeaderboardPanel', () => {
 
     expect(wrapper.text()).toContain('会议投稿')
     expect(wrapper.text()).toContain('通过会议')
-    expect(wrapper.text()).toContain('••••1234')
+    expect(wrapper.text()).toContain('KZ')
+    expect(wrapper.text()).not.toContain('1234')
     expect(wrapper.text()).toContain('通过 4 次')
     expect(wrapper.find('.current-user-row').text()).toContain('我')
   })

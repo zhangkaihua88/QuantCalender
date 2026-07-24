@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { replayInputSchema } from '@wq-calendar/shared'
 import { canonicalReplayUrl, detectReplayProvider } from '../src/replays'
-import { visibleMemberIdentity } from '../src/identity'
+import { hiddenMemberIdentity, visibleMemberIdentity } from '../src/identity'
 import { encryptWqId } from '../src/crypto'
 import type { Env } from '../src/env'
 
@@ -33,7 +33,9 @@ describe('member identity visibility', () => {
     const row = { wq_id_hint:'••••2345', wq_id_ciphertext:await encryptWqId('KZ12345', secret), public_wq_id:1 }
     const env = { WQ_ID_HMAC_SECRET:secret } as Env
     expect(await visibleMemberIdentity(row, env, 'member')).toEqual({ wqId:'KZ12345', hasFullWqId:true })
-    expect(await visibleMemberIdentity({ ...row, public_wq_id:0 }, env, 'member')).toEqual({ wqId:'••••2345', hasFullWqId:false })
+    expect(await visibleMemberIdentity({ ...row, public_wq_id:0 }, env, 'member')).toEqual({ wqId:'KZ', hasFullWqId:false })
     expect(await visibleMemberIdentity({ ...row, public_wq_id:0 }, env, 'admin')).toEqual({ wqId:'KZ12345', hasFullWqId:true })
+    expect(await visibleMemberIdentity({ ...row, wq_id_ciphertext:null, public_wq_id:0 }, env, 'member')).toEqual({ wqId:'成员', hasFullWqId:false })
+    expect(hiddenMemberIdentity('a1b234')).toBe('AB')
   })
 })

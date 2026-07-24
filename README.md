@@ -1,74 +1,104 @@
-# WQ Meeting Calendar
+<p align="center">
+  <img src="web/public/calendar-logo.png" width="96" height="96" alt="WQ Meeting Calendar Logo" />
+</p>
 
-面向中国大陆与香港成员的非官方会议日历。前端部署在 GitHub Pages，私密会议、成员名单和审批数据由 Cloudflare Worker + D1 保存。
+<h1 align="center">WQ Meeting Calendar</h1>
 
-## 项目结构
+<p align="center">
+  一个由成员共同维护的会议日历与回放中心。<br />
+  发现会议、完成注册、订阅提醒，也让有价值的回放更容易被再次找到。
+</p>
 
-- `web/`：Vue 3、TypeScript、Vite 前端
-- `worker/`：Cloudflare Worker API、D1 迁移和 iCalendar 输出
-- `packages/shared/`：前后端共用的 Zod 校验和 TypeScript 类型
+<p align="center">
+  <img src="web/public/og.png" alt="WQ Meeting Calendar 页面预览" />
+</p>
 
-## 本地开发
+## 为什么做这个项目
 
-本项目使用 pnpm workspace。
+会议通知常常散落在聊天记录、群公告和临时链接中：容易错过，也很难在结束后重新找到资料。
 
-1. 安装依赖：`pnpm install`
-2. 复制 `worker/.dev.vars.example` 为 `worker/.dev.vars`，替换所有示例密钥。
-3. 初始化本地数据库：`pnpm --filter @wq-calendar/worker exec wrangler d1 migrations apply wq-meeting-calendar --local`
-4. 分别启动 API 与前端：`pnpm dev:worker`、`pnpm dev`
-5. 浏览 `http://localhost:5173`
+WQ Meeting Calendar 将会议安排、成员投稿、管理员审批、个人日历提醒和会议回放集中在一处。成员可以补充新的会议与回放来源，管理员负责确认内容，形成一份持续更新、方便查找的共享日程。
 
-开发环境会跳过 Turnstile 的服务端验证。示例 CSV 只含虚构 ID，不应把真实成员 CSV 提交到 Git。
+## 主要功能
 
-## 管理员密码与密钥
+### 会议中心
 
-运行：
+- 以近期议程或月历方式查看会议
+- 所有时间统一换算并显示为北京时间
+- 按标题、类别、语言和会议形式筛选
+- 直接打开注册链接，或先查看会议详情
+- 周期会议在议程中只展示最近一次，月历保留具体场次
 
-```text
-node worker/scripts/hash-admin-password.mjs
+### 成员投稿与审批
+
+- 成员可在会议页面直接弹出投稿表单
+- 投稿通过前不会出现在公开会议列表
+- 管理员可以审核、修正、拒绝或发布投稿
+- “我的投稿”集中展示会议与回放的审核状态及反馈
+
+### 会议回放
+
+- 支持百度网盘、夸克网盘、阿里云盘、OneDrive、Google Drive、Dropbox、微云及其他 HTTPS 来源
+- 同一场会议可以由多名成员补充多个不同回放链接
+- 每个来源可附带提取码和简短备注
+- 成员可以反馈链接失效，管理员决定处理、下架或恢复
+
+### 日历订阅与提醒
+
+- 生成个人私密的 iCalendar 订阅地址
+- 支持不提醒、提前 10 分钟、30 分钟、1 小时或 1 天
+- 可将单场会议加入 Google、Outlook 或 Apple Calendar
+- 会议改期、取消和周期例外会通过订阅源同步
+
+### 投稿排行
+
+- 会议投稿与回放贡献分别排名
+- 展示投稿次数、通过次数、通过率和回放贡献会议数
+- 成员可以选择显示完整 WQ_ID，或隐藏为开头两个字母
+- 管理员账号不参与排行榜
+
+## 使用流程
+
+### 普通成员
+
+1. 使用已导入名单中的 WQ_ID 登录。
+2. 在“会议”中查找会议、注册或提交新的会议信息。
+3. 在“回放”中浏览、补充回放来源或反馈失效链接。
+4. 在“设置”中生成个人订阅地址并选择默认提醒。
+5. 在“我的投稿”查看审核进度和管理员反馈。
+
+### 管理员
+
+1. 导入并维护成员名单。
+2. 在统一的“待审”页面处理会议与回放投稿。
+3. 管理会议系列、单次改期、取消和回放来源。
+4. 查看成员使用情况、投稿排行和审计记录。
+
+## 隐私与安全
+
+- 会议和成员数据保存在 Cloudflare D1，不进入前端构建产物。
+- 登录使用随机不透明令牌，数据库只保存令牌哈希。
+- 登录 Cookie 设置为 `HttpOnly + Secure + SameSite=Strict`。
+- 修改请求同时验证会话、CSRF 和允许的前端来源。
+- WQ_ID 使用带服务端密钥的索引，并加密保存管理员所需的身份数据。
+- 私密日历订阅地址可以随时旋转或撤销。
+- 外部回放链接只做记录和人工审批，服务端不会主动访问网盘内容。
+
+请勿提交会议密码、个人专属入会链接、内部文件或参与者名单。
+
+## 项目组成
+
+- `web/`：Vue 3 + TypeScript 前端，发布到 GitHub Pages
+- `worker/`：Cloudflare Worker API、D1 数据库与 iCalendar 输出
+- `packages/shared/`：前后端共用的数据类型和校验规则
+
+## 维护检查
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-脚本会输出管理员密码的 SHA-256 验证值，以及两个独立的随机密钥建议。管理员密码必须是至少 20 位的高熵随机值。
-
-生产环境通过 `wrangler secret put` 配置：
-
-- `ADMIN_WQ_ID`
-- `ADMIN_PASSWORD_HASH`
-- `WQ_ID_HMAC_SECRET`
-- `TURNSTILE_SECRET`
-- `SESSION_SECRET`
-
-会话令牌以带密钥的 HMAC-SHA-256 形式保存。成员 WQ_ID 使用 `WQ_ID_HMAC_SECRET` 生成不可逆登录索引，并通过独立派生的 AES-GCM 密钥加密保存，供管理员查看成员登录、活跃和订阅统计。轮换 `WQ_ID_HMAC_SECRET` 会同时使现有成员登录索引和已加密 WQ_ID 失效，因此必须重新导入成员 CSV；轮换 `SESSION_SECRET` 会立即使全部旧会话失效，更新 `ADMIN_PASSWORD_HASH` 会立即使全部旧管理员会话失效。
-
-## Cloudflare 部署
-
-创建 D1：`wrangler d1 create wq-meeting-calendar`。将返回的 `database_id` 配置为 GitHub Repository Variable `CLOUDFLARE_D1_DATABASE_ID`，并为 Worker 添加 API 自定义域名。
-
-30 天登录依赖同一主域名下的两个子域：前端 `calendar.<域名>`，API `api.calendar.<域名>`。API Cookie 使用 `HttpOnly + Secure + SameSite=Strict`，并额外校验 CSRF 和精确 Origin。
-
-## GitHub Pages 部署
-
-在 GitHub Pages 中选择 GitHub Actions，并配置生产 API 地址、Turnstile Sitekey、前端来源和所需 Worker Secrets。
-
-## 成员导入
-
-管理员后台接受：
-
-```csv
-wq_id,country
-EXAMPLE_001,CN
-EXAMPLE_002,HK
-```
-
-导入采用“整体替换”：CSV 中缺失的旧成员会停用，其现有登录会话和私密日历订阅立即失效。导入前会检查表头、地区和重复 ID；导入日期由服务端自动记录。
-
-## 验证
-
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm build`
-- `pnpm check`
-
-## 安全边界
-
-WQ_ID 登录仅是名单门禁，不能证明当前使用者真正拥有该 ID。不要在会议记录中保存密码、个人专属入会链接、内部文件或参与者名单。本项目不代表 WorldQuant 官方立场。
+项目仍在持续完善中，欢迎通过 Issue 提交问题和改进建议。

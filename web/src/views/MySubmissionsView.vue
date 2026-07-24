@@ -33,7 +33,7 @@ async function loadReplays(page = replayPagination.value.page) {
 </script>
 
 <template>
-  <div class="page-head"><div><p class="eyebrow">MY SUBMISSIONS</p><h1>我的投稿</h1><p class="subtitle">查看当前 WQ_ID 提交的会议、回放来源和管理员反馈。</p></div><RouterLink class="button" :to="tab === 'meeting' ? '/submit' : '/replays/submit'">{{ tab === 'meeting' ? '提交新会议' : '投稿新回放' }}</RouterLink></div>
+  <div class="page-head"><div><p class="eyebrow">MY SUBMISSIONS</p><h1>我的投稿</h1><p class="subtitle">查看当前 WQ_ID 提交的会议、回放来源和管理员反馈。</p></div><RouterLink class="button" :to="tab === 'meeting' ? '/?submit=1' : '/replays/submit'">{{ tab === 'meeting' ? '提交新会议' : '投稿新回放' }}</RouterLink></div>
   <div class="segmented submission-switch"><button :class="{active:tab==='meeting'}" @click="tab='meeting'">会议投稿</button><button :class="{active:tab==='replay'}" @click="tab='replay'">回放投稿</button></div>
   <div v-if="error" class="error-box">{{ error }}</div>
   <div v-else-if="loading" class="empty-state">正在加载投稿记录…</div>

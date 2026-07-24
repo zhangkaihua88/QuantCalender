@@ -3,16 +3,16 @@
   <div class="panel-grid">
     <section class="card card-body detail-copy">
       <h2>1. 查找并注册会议</h2>
-      <p>进入“日历”后，可在议程和月历之间切换，并按关键词、类别、语言或会议形式筛选。点击“立即注册”会直接打开会议注册页面；点击“查看详情”可以先查看完整时间和会议信息。</p>
+      <p>进入“会议”后，可在议程和月历之间切换，并按关键词、类别、语言或会议形式筛选。点击“立即注册”会直接打开会议注册页面；点击“查看详情”可以先查看完整时间和会议信息。</p>
 
       <h2>2. 提交会议</h2>
-      <p>进入“投稿”，填写会议标题、类别、语言、注册链接、北京时间和持续时长。投稿后会进入审核队列，管理员通过后才会显示在公共日历中。</p>
+      <p>在“会议”页面点击“投稿会议”，在弹出的窗口中填写会议标题、类别、语言、注册链接、北京时间和持续时长。投稿后会进入审核队列，管理员通过后才会公开显示。</p>
 
       <h2>3. 查看审核结果</h2>
       <p>在“我的投稿”中可以查看待审核、已发布或未通过的会议。若管理员留下反馈，也会显示在对应投稿下方。</p>
 
       <div class="inline">
-        <RouterLink class="button" to="/submit">提交会议</RouterLink>
+        <RouterLink class="button" to="/?submit=1">提交会议</RouterLink>
         <RouterLink class="button secondary" to="/submissions">查看我的投稿</RouterLink>
       </div>
 
@@ -26,7 +26,7 @@
         <h2>5. 设置提醒与身份显示</h2>
         <p>进入“提醒”，选择不提醒、提前 10 分钟、30 分钟、1 小时或 1 天，然后生成个人订阅地址，并在 Google、Outlook 或 Apple Calendar 中通过 URL 添加订阅。</p>
         <p>订阅地址属于个人访问凭证，请勿转发。旋转或撤销后，旧地址会立即失效。</p>
-        <p>完整 WQ_ID 默认会显示在排行榜和回放贡献者位置；如需隐藏，可在设置中切换为仅显示末四位。</p><RouterLink class="button secondary" to="/calendar-settings">打开成员设置</RouterLink>
+        <p>完整 WQ_ID 默认会显示在排行榜和回放贡献者位置；如需隐藏，可在设置中切换为仅显示开头两个字母，不显示后续数字。</p><RouterLink class="button secondary" to="/calendar-settings">打开成员设置</RouterLink>
       </section>
 
       <section class="card card-body detail-copy">

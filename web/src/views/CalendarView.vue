@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Calendar, ChevronLeft, ChevronRight, ExternalLink, Eye, List, Search } from 'lucide-vue-next'
-import type { MeetingOccurrence } from '@wq-calendar/shared'
+import { Calendar, ChevronLeft, ChevronRight, ExternalLink, Eye, List, Plus, Search, X } from 'lucide-vue-next'
+import type { MeetingInput, MeetingOccurrence } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
+import { session } from '../state'
+import MeetingForm from '../components/MeetingForm.vue'
 
 const occurrences = ref<MeetingOccurrence[]>([])
 const loading = ref(true)
@@ -13,6 +15,10 @@ const meetingLanguage = ref('')
 const locationType = ref('')
 const view = ref<'agenda' | 'month'>('agenda')
 const monthCursor = ref(new Date())
+const submitOpen = ref(session.user?.role === 'member' && new URLSearchParams(window.location.hash.split('?')[1] || '').get('submit') === '1')
+const submitBusy = ref(false)
+const submitError = ref('')
+const submitSuccess = ref(false)
 
 const formatter = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'long', day: 'numeric', weekday: 'short' })
 const timeFormatter = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -83,15 +89,40 @@ function detailLink(item: MeetingOccurrence) {
     query: { occurrence: item.occurrenceKey, start: item.startUtc, end: item.endUtc, status: item.status }
   }
 }
+
+function openSubmission() {
+  submitError.value = ''
+  submitSuccess.value = false
+  submitOpen.value = true
+}
+
+function closeSubmission() {
+  submitOpen.value = false
+  submitError.value = ''
+  submitSuccess.value = false
+}
+
+async function submitMeeting(meeting: MeetingInput) {
+  submitBusy.value = true
+  submitError.value = ''
+  try {
+    await api('/v1/submissions', { method:'POST', body:JSON.stringify(meeting) })
+    submitSuccess.value = true
+  } catch (caught) { submitError.value = caught instanceof ApiError ? caught.message : '投稿失败' }
+  finally { submitBusy.value = false }
+}
 </script>
 
 <template>
   <div>
     <div class="page-head">
       <div><p class="eyebrow">MEMBER CALENDAR</p><h1>会议安排</h1><p class="subtitle">所有时间均按北京时间显示。订阅个人日历后，新会议、改期和取消会随客户端刷新同步。</p></div>
-      <div class="segmented" aria-label="切换日历视图">
-        <button :class="{ active: view === 'agenda' }" @click="view = 'agenda'"><List :size="16" /> 议程</button>
-        <button :class="{ active: view === 'month' }" @click="view = 'month'"><Calendar :size="16" /> 月历</button>
+      <div class="calendar-page-actions">
+        <button v-if="session.user?.role === 'member'" class="button meeting-submit-button" type="button" @click="openSubmission"><Plus :size="17" />投稿会议</button>
+        <div class="segmented" aria-label="切换日历视图">
+          <button :class="{ active: view === 'agenda' }" @click="view = 'agenda'"><List :size="16" /> 议程</button>
+          <button :class="{ active: view === 'month' }" @click="view = 'month'"><Calendar :size="16" /> 月历</button>
+        </div>
       </div>
     </div>
 
@@ -146,5 +177,22 @@ function detailLink(item: MeetingOccurrence) {
         </div>
       </div>
     </template>
+
+    <div v-if="submitOpen" class="modal-backdrop" @click.self="closeSubmission">
+      <section class="card card-body meeting-submit-dialog" role="dialog" aria-modal="true" aria-labelledby="meeting-submit-title" @keydown.esc="closeSubmission">
+        <div class="section-title meeting-submit-dialog-head">
+          <div><p class="eyebrow">SUBMIT A MEETING</p><h2 id="meeting-submit-title">投稿会议</h2><p class="subtitle">提交后由管理员审核，通过后才会出现在会议列表中。</p></div>
+          <button class="icon-button" type="button" aria-label="关闭投稿窗口" @click="closeSubmission"><X :size="19" /></button>
+        </div>
+        <div v-if="submitSuccess" class="meeting-submit-success">
+          <div class="success-box"><strong>投稿已进入审核队列。</strong><br />可以前往“我的投稿”查看审核结果。</div>
+          <div class="inline"><RouterLink class="button" to="/submissions" @click="closeSubmission">查看我的投稿</RouterLink><button class="button secondary" type="button" @click="submitSuccess=false">继续投稿</button></div>
+        </div>
+        <template v-else>
+          <div v-if="submitError" class="error-box meeting-submit-error">{{ submitError }}</div>
+          <MeetingForm :busy="submitBusy" @submit="submitMeeting" />
+        </template>
+      </section>
+    </div>
   </div>
 </template>

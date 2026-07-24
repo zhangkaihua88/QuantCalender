@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../src/api'
+import { session } from '../src/state'
 import CalendarView from '../src/views/CalendarView.vue'
 
 vi.mock('../src/api', () => ({
@@ -10,6 +11,8 @@ vi.mock('../src/api', () => ({
 
 describe('CalendarView', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    session.user = { role:'member', memberId:'member-1', wqIdHint:'••••1234', country:'CN', publicWqId:true, expiresAt:'2099-01-01T00:00:00Z' }
     vi.mocked(api).mockResolvedValue({
       occurrences: [{
         eventId: 'meeting-1', occurrenceKey: '2099-08-01T10:00:00Z', title: '顾问周会',
@@ -37,6 +40,23 @@ describe('CalendarView', () => {
         status: 'published', isException: false
       }]
     })
+  })
+
+  it('opens meeting submission as a dialog from the meeting page', async () => {
+    const wrapper = mount(CalendarView, {
+      global: {
+        stubs: {
+          RouterLink: { props: ['to'], template: '<a class="router-link"><slot /></a>' }
+        }
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    await wrapper.find('.meeting-submit-button').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.find('[role="dialog"]').text()).toContain('投稿会议')
+    expect(wrapper.find('[role="dialog"] form').exists()).toBe(true)
   })
 
   it('shows separate detail and direct registration buttons', async () => {

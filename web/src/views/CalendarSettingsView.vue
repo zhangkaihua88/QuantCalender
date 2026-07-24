@@ -42,7 +42,7 @@ async function revoke() { if (!confirm('撤销后，旧订阅地址将立即失�
   <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div>
   <div class="panel-grid">
     <div class="stack">
-      <section class="card card-body stack"><div><h2>贡献者身份显示</h2><p class="subtitle">此设置统一作用于会议榜、回放榜和回放来源卡片；管理员始终可以查看完整 WQ_ID。</p></div><label class="preference-toggle"><input v-model="publicWqId" type="checkbox" :disabled="identityBusy" @change="updateIdentity" /><span><strong>向登录成员显示完整 WQ_ID</strong><small>{{ publicWqId ? '当前显示完整 ID；关闭后仅显示末四位。' : '当前仅显示末四位提示。' }}</small></span></label></section>
+      <section class="card card-body stack"><div><h2>贡献者身份显示</h2><p class="subtitle">此设置统一作用于会议榜、回放榜和回放来源卡片；管理员始终可以查看完整 WQ_ID。</p></div><label class="preference-toggle"><input v-model="publicWqId" type="checkbox" :disabled="identityBusy" @change="updateIdentity" /><span><strong>向登录成员显示完整 WQ_ID</strong><small>{{ publicWqId ? '当前显示完整 ID；关闭后仅显示开头两个字母。' : '当前仅显示开头两个字母，不显示后续数字。' }}</small></span></label></section>
       <section class="card card-body stack">
         <div><h2>个人日历提醒</h2><p class="subtitle">生成专属订阅地址后，可加入 Google、Outlook 或 Apple Calendar。地址等同于访问凭证，请勿转发。</p></div>
         <div class="notice-box">订阅刷新频率由日历客户端决定，可能不是即时。网站会保持会议 UID 稳定，并同步改期、取消和重复会议例外。</div>

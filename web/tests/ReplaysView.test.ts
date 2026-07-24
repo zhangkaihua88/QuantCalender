@@ -12,7 +12,7 @@ describe('ReplaysView', () => {
     vi.mocked(api).mockResolvedValue({
       groups: [{ id:'group-1', eventId:'event-1', occurrenceKey:'2026-07-24T12:00:00Z', title:'顾问周会', meetingDate:'2026-07-24', links:[
         { id:'link-1', provider:'baidu', providerLabel:'百度网盘', shareUrl:'https://pan.baidu.com/s/a', accessCode:'3k8p', note:'完整录像', contributorWqId:'KZ12345', contributorHasFullWqId:true, openReportCount:0, reportedByMe:false },
-        { id:'link-2', provider:'quark', providerLabel:'夸克网盘', shareUrl:'https://pan.quark.cn/s/b', accessCode:'', note:'备用来源', contributorWqId:'••••6789', contributorHasFullWqId:false, openReportCount:1, reportedByMe:false }
+        { id:'link-2', provider:'quark', providerLabel:'夸克网盘', shareUrl:'https://pan.quark.cn/s/b', accessCode:'', note:'备用来源', contributorWqId:'AB', contributorHasFullWqId:false, openReportCount:1, reportedByMe:false }
       ] }],
       pagination: { page:1, pageSize:20, total:1, totalPages:1 }
     })
@@ -26,6 +26,8 @@ describe('ReplaysView', () => {
     expect(wrapper.text()).toContain('百度网盘')
     expect(wrapper.text()).toContain('夸克网盘')
     expect(wrapper.text()).toContain('KZ12345')
+    expect(wrapper.text()).toContain('贡献者：AB')
+    expect(wrapper.text()).not.toContain('6789')
     expect(wrapper.text()).toContain('已有 1 人反馈')
   })
 })
