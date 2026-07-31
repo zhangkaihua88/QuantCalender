@@ -18,6 +18,7 @@ describe('CalendarSettingsView', () => {
     const wrapper = mount(CalendarSettingsView)
     await flushPromises()
 
+    expect(wrapper.text()).toContain('重新生成新地址后，旧地址会立即作废')
     const select = wrapper.find('#default-alarm')
     expect(select.text()).toContain('不提醒')
     expect((select.element as HTMLSelectElement).value).toBe('0')

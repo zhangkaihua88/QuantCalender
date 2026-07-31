@@ -44,7 +44,7 @@ async function revoke() { if (!confirm('撤销后，旧订阅地址将立即失�
     <div class="stack">
       <section class="card card-body stack"><div><h2>贡献者身份显示</h2><p class="subtitle">此设置统一作用于会议榜、回放榜和回放来源卡片；管理员始终可以查看完整 WQ_ID。</p></div><label class="preference-toggle"><input v-model="publicWqId" type="checkbox" :disabled="identityBusy" @change="updateIdentity" /><span><strong>向登录成员显示完整 WQ_ID</strong><small>{{ publicWqId ? '当前显示完整 ID；关闭后仅显示开头两个字母。' : '当前仅显示开头两个字母，不显示后续数字。' }}</small></span></label></section>
       <section class="card card-body stack">
-        <div><h2>个人日历提醒</h2><p class="subtitle">生成专属订阅地址后，可加入 Google、Outlook 或 Apple Calendar。地址等同于访问凭证，请勿转发。</p></div>
+        <div><h2>个人日历提醒</h2><p class="subtitle">生成专属订阅地址后，可加入 Google、Outlook 或 Apple Calendar。地址等同于访问凭证，请勿转发。重新生成新地址后，旧地址会立即作废。</p></div>
         <div class="notice-box">订阅刷新频率由日历客户端决定，可能不是即时。网站会保持会议 UID 稳定，并同步改期、取消和重复会议例外。</div>
         <div class="field"><label for="default-alarm">默认提前提醒</label><select id="default-alarm" v-model="alarmMinutes" @change="updateAlarm"><option :value="0">不提醒</option><option :value="10">10 分钟</option><option :value="30">30 分钟</option><option :value="60">1 小时</option><option :value="1440">1 天</option></select></div>
         <div v-if="feedUrl" class="field"><label for="feed-url">新订阅地址（仅显示这一次）</label><input id="feed-url" :value="feedUrl" readonly /><button class="button secondary" @click="copy"><Check v-if="copied" :size="17" /><Copy v-else :size="17" />{{ copied ? '已复制' : '复制地址' }}</button></div>
