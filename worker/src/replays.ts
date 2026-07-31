@@ -3,6 +3,7 @@ import {
   decisionSchema,
   replayAdminUpdateSchema,
   replayInputSchema,
+  replayOccurrenceQuerySchema,
   replayProviderSchema,
   replayReportResolutionSchema,
   replayReportSchema,
@@ -87,6 +88,14 @@ export function canonicalReplayUrl(value: string): string {
   url.hostname = url.hostname.toLowerCase()
   if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '')
   return url.toString()
+}
+
+export function parseReplayOccurrenceFilter(eventId: string, occurrenceKey: string) {
+  if (Boolean(eventId) !== Boolean(occurrenceKey)) return { success:false as const, reason:'pair' as const }
+  if (!eventId && !occurrenceKey) return { success:true as const, data:null }
+  const parsed = replayOccurrenceQuerySchema.safeParse({ eventId, occurrenceKey })
+  if (!parsed.success) return { success:false as const, reason:'invalid' as const }
+  return { success:true as const, data:parsed.data }
 }
 
 function parsePage(value: string | undefined): number {
@@ -243,6 +252,10 @@ export function registerReplayRoutes(app: CalendarApp) {
     if ((from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) || (to && !/^\d{4}-\d{2}-\d{2}$/.test(to))) {
       return apiError(context, 422, 'INVALID_DATE_RANGE', '会议日期范围无效')
     }
+    const eventId = context.req.query('eventId') || ''
+    const occurrenceKey = context.req.query('occurrenceKey') || ''
+    const occurrenceFilter = parseReplayOccurrenceFilter(eventId, occurrenceKey)
+    if (!occurrenceFilter.success) return apiError(context, 422, 'INVALID_OCCURRENCE_FILTER', occurrenceFilter.reason === 'pair' ? '会议和具体场次必须同时提供' : '会议场次筛选无效')
 
     const conditions = ["EXISTS (SELECT 1 FROM replay_links visible WHERE visible.group_id = rg.id AND visible.status = 'published')"]
     const values: string[] = []
@@ -253,6 +266,10 @@ export function registerReplayRoutes(app: CalendarApp) {
     }
     if (from) { conditions.push('rg.meeting_date >= ?'); values.push(from) }
     if (to) { conditions.push('rg.meeting_date <= ?'); values.push(to) }
+    if (occurrenceFilter.data) {
+      conditions.push('rg.event_id = ?', 'rg.occurrence_key = ?')
+      values.push(occurrenceFilter.data.eventId, occurrenceFilter.data.occurrenceKey)
+    }
     const where = `WHERE ${conditions.join(' AND ')}`
     const count = await context.env.DB.prepare(`SELECT COUNT(*) AS count FROM replay_groups rg ${where}`).bind(...values).first<{ count: number }>()
     const total = count?.count || 0

@@ -8,7 +8,7 @@ import type { SessionUser } from '@wq-calendar/shared'
 declare global {
   interface Window {
     turnstile?: {
-      render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; 'expired-callback': () => void }) => string
+      render: (element: HTMLElement, options: { sitekey: string; action: string; callback: (token: string) => void; 'expired-callback': () => void }) => string
       reset: (widgetId: string) => void
     }
   }
@@ -24,16 +24,17 @@ const error = ref('')
 const widget = ref<HTMLElement | null>(null)
 let script: HTMLScriptElement | null = null
 let widgetId = ''
+const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileRequired = Boolean(siteKey && !siteKey.startsWith('1x000'))
 
 onMounted(() => {
-  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
-  if (!siteKey || siteKey.startsWith('1x000')) return
+  if (!turnstileRequired) return
   script = document.createElement('script')
   script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
   script.async = true
   script.defer = true
   script.onload = () => {
-    if (widget.value && window.turnstile) widgetId = window.turnstile.render(widget.value, { sitekey: siteKey, callback: (token) => { turnstileToken.value = token }, 'expired-callback': () => { turnstileToken.value = '' } })
+    if (widget.value && window.turnstile) widgetId = window.turnstile.render(widget.value, { sitekey: siteKey, action: 'turnstile-spin-v2', callback: (token) => { turnstileToken.value = token; error.value = '' }, 'expired-callback': () => { turnstileToken.value = '' } })
   }
   document.head.appendChild(script)
 })
@@ -41,8 +42,12 @@ onMounted(() => {
 onBeforeUnmount(() => { script?.remove() })
 
 async function submit() {
-  busy.value = true
   error.value = ''
+  if (turnstileRequired && !turnstileToken.value) {
+    error.value = '请先完成人机验证'
+    return
+  }
+  busy.value = true
   try {
     const data = mode.value === 'member'
       ? await login('/v1/session/member', { wqId: wqId.value, turnstileToken: turnstileToken.value })

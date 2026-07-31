@@ -4,7 +4,8 @@ import { api } from '../src/api'
 import { session } from '../src/state'
 import ReplaySubmitView from '../src/views/ReplaySubmitView.vue'
 
-vi.mock('vue-router', () => ({ useRoute:() => ({ query:{} }) }))
+const routeQuery = vi.hoisted(() => ({ value:{} as Record<string, string> }))
+vi.mock('vue-router', () => ({ useRoute:() => ({ get query() { return routeQuery.value } }) }))
 vi.mock('../src/api', () => ({ api:vi.fn(), ApiError:class ApiError extends Error {} }))
 
 const occurrence = {
@@ -16,6 +17,8 @@ const occurrence = {
 
 describe('ReplaySubmitView', () => {
   beforeEach(() => {
+    routeQuery.value = {}
+    vi.clearAllMocks()
     session.user = { role:'member', memberId:'member-1', wqIdHint:'••••1234', country:'CN', publicWqId:true, expiresAt:'2099-01-01T00:00:00Z' }
     vi.mocked(api).mockImplementation(async (path) => path.startsWith('/v1/meetings?') ? { occurrences:[occurrence] } : { submission:{ id:'link-1', status:'pending' } })
   })
@@ -32,5 +35,14 @@ describe('ReplaySubmitView', () => {
     const submitCall = vi.mocked(api).mock.calls.find(([path]) => path === '/v1/replay-submissions')
     const payload = JSON.parse(String(submitCall?.[1]?.body))
     expect(payload).toMatchObject({ eventId:occurrence.eventId, occurrenceKey:occurrence.occurrenceKey, title:'顾问周会', meetingDate:'2099-08-01' })
+  })
+
+  it('preselects a meeting occurrence from a history deep link', async () => {
+    routeQuery.value = { eventId:occurrence.eventId, occurrenceKey:occurrence.occurrenceKey }
+    const wrapper = mount(ReplaySubmitView, { global:{ stubs:{ RouterLink:{ template:'<a><slot /></a>' } } } })
+    await flushPromises()
+    expect((wrapper.find('#related-meeting').element as HTMLSelectElement).value).toBe(`${occurrence.eventId}|${occurrence.occurrenceKey}`)
+    expect((wrapper.find('#replay-title').element as HTMLInputElement).value).toBe('顾问周会')
+    expect((wrapper.find('#replay-date').element as HTMLInputElement).value).toBe('2099-08-01')
   })
 })

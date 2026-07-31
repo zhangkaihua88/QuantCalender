@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { AlertTriangle, Check, Copy, ExternalLink, Plus, Search } from 'lucide-vue-next'
 import type { ReplayGroup, ReplayProvider } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
@@ -7,6 +8,7 @@ import { session } from '../state'
 
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number }
 
+const route = useRoute()
 const groups = ref<ReplayGroup[]>([])
 const pagination = ref<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 1 })
 const loading = ref(true)
@@ -20,6 +22,12 @@ const copiedLinkId = ref('')
 const reportingLinkId = ref('')
 const reportReason = ref<'unavailable' | 'invalid_code' | 'content_mismatch' | 'other'>('unavailable')
 const reportNote = ref('')
+const linkedEventId = computed(() => typeof route.query.eventId === 'string' ? route.query.eventId : '')
+const linkedOccurrenceKey = computed(() => typeof route.query.occurrenceKey === 'string' ? route.query.occurrenceKey : '')
+const hasOccurrenceFilter = computed(() => Boolean(linkedEventId.value && linkedOccurrenceKey.value))
+const replaySubmitTarget = computed(() => hasOccurrenceFilter.value
+  ? { path:'/replays/submit', query:{ eventId:linkedEventId.value, occurrenceKey:linkedOccurrenceKey.value } }
+  : '/replays/submit')
 
 onMounted(() => load(1))
 
@@ -31,6 +39,8 @@ async function load(page = pagination.value.page) {
   if (provider.value) params.set('provider', provider.value)
   if (from.value) params.set('from', from.value)
   if (to.value) params.set('to', to.value)
+  if (linkedEventId.value) params.set('eventId', linkedEventId.value)
+  if (linkedOccurrenceKey.value) params.set('occurrenceKey', linkedOccurrenceKey.value)
   try {
     const data = await api<{ groups: ReplayGroup[]; pagination: Pagination }>(`/v1/replays?${params}`)
     groups.value = data.groups
@@ -79,8 +89,8 @@ function displayDate(value: string) {
 
 <template>
   <div class="page-head">
-    <div><p class="eyebrow">MEETING REPLAYS</p><h1>会议回放</h1><p class="subtitle">同一场会议可以收录多个网盘来源。所有链接均由成员投稿并经管理员审核。</p></div>
-    <div v-if="session.user?.role === 'member'" class="inline"><RouterLink class="button secondary" to="/submissions">我的投稿</RouterLink><RouterLink class="button" to="/replays/submit"><Plus :size="17" />投稿回放</RouterLink></div>
+    <div><p class="eyebrow">MEETING REPLAYS</p><h1>{{ hasOccurrenceFilter ? '场次回放' : '会议回放' }}</h1><p class="subtitle">{{ hasOccurrenceFilter ? '仅显示与所选会议场次精确关联的已审核回放。' : '同一场会议可以收录多个网盘来源。所有链接均由成员投稿并经管理员审核。' }}</p></div>
+    <div v-if="session.user?.role === 'member'" class="inline"><RouterLink class="button secondary" to="/submissions">我的投稿</RouterLink><RouterLink class="button" :to="replaySubmitTarget"><Plus :size="17" />投稿回放</RouterLink></div>
   </div>
 
   <div v-if="session.user?.role === 'member' && session.user.publicWqId" class="notice-box identity-notice">你的完整 WQ_ID 会显示在回放来源和排行榜中。<RouterLink to="/calendar-settings">前往设置隐藏</RouterLink></div>
@@ -96,7 +106,7 @@ function displayDate(value: string) {
   </div>
 
   <div v-if="loading" class="empty-state">正在整理会议回放…</div>
-  <div v-else-if="!groups.length" class="empty-state"><div><h2>暂时没有匹配的回放</h2><p>可以投稿第一个来源，等待管理员审核。</p></div></div>
+  <div v-else-if="!groups.length" class="empty-state"><div><h2>{{ hasOccurrenceFilter ? '该场会议暂时没有回放' : '暂时没有匹配的回放' }}</h2><p>可以投稿第一个来源，等待管理员审核。</p><RouterLink v-if="hasOccurrenceFilter && session.user?.role === 'member'" class="button" style="margin-top:12px" :to="replaySubmitTarget"><Plus :size="16" />为该场会议投稿回放</RouterLink></div></div>
   <div v-else class="replay-grid">
     <article v-for="group in groups" :key="group.id" class="card replay-card">
       <header class="replay-card-head">

@@ -44,6 +44,7 @@ a { color: inherit; }
 .github-link:hover { color: var(--teal-dark); border-color: #9fc9c3; background: var(--teal-soft); }
 .icon-button { width: 40px; height: 40px; display: grid; place-items: center; color: var(--muted); border: 1px solid var(--line); border-radius: 11px; background: var(--paper); cursor: pointer; }
 .icon-button:hover { color: var(--red); border-color: #e9bbb4; }
+.icon-button:disabled { opacity: .38; cursor: not-allowed; }
 .page-container { width: min(1240px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 70px; flex: 1; }
 .site-footer { display: flex; justify-content: space-between; gap: 20px; padding: 22px clamp(20px, 4vw, 56px); border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 
@@ -93,6 +94,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .segmented { display: flex; padding: 4px; border-radius: 11px; background: #e9ebe6; }
 .segmented button { min-height: 35px; padding: 0 13px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; font-weight: 700; }
 .segmented button.active { color: var(--ink); background: white; box-shadow: 0 3px 10px rgba(23,50,77,.08); }
+.calendar-scope button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 
 .hero-meeting { display: grid; grid-template-columns: 160px 1fr auto; gap: 26px; align-items: center; padding: clamp(22px, 4vw, 34px); margin-bottom: 24px; color: white; border-radius: 24px; background: linear-gradient(132deg, #17324d 0%, #1a5e68 74%, #217b78 100%); box-shadow: 0 25px 60px rgba(23,50,77,.18); overflow: hidden; position: relative; }
 .hero-meeting::after { content: ''; position: absolute; width: 260px; height: 260px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; right: -90px; top: -150px; }
@@ -114,7 +116,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .agenda-item h3 { margin: 0 0 6px; }
 .agenda-item p { margin: 0; color: var(--muted); font-size: 13px; }
 .agenda-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.agenda-actions { display: flex; align-items: center; gap: 8px; }
+.agenda-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .agenda-actions .button { min-height: 44px; padding: 0 14px; font-size: 13px; white-space: nowrap; }
 .cancelled { opacity: .62; }
 .cancelled h3 { text-decoration: line-through; }
@@ -129,6 +131,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .day-number { display: inline-grid; place-items: center; width: 28px; height: 28px; font-size: 12px; font-weight: 800; }
 .day-number.today { color: white; border-radius: 50%; background: var(--teal); }
 .calendar-chip { display: block; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; margin-top: 5px; padding: 5px 7px; color: var(--teal-dark); border-left: 3px solid var(--teal); border-radius: 5px; background: var(--teal-soft); font-size: 11px; font-weight: 700; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-chip.historical { color: #52636d; border-left-color: #829197; background: #e8ecea; }
 .calendar-page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .meeting-submit-dialog { width: min(820px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; }
 .meeting-submit-dialog-head { align-items: flex-start; margin-top: 0; }
@@ -163,6 +166,7 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .status { display: inline-flex; align-items: center; min-height: 25px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .status.pending, .status.draft { color: #71501e; background: var(--gold-soft); }
 .status.published { color: var(--teal-dark); background: var(--teal-soft); }
+.status.ended { color: #52636d; background: #e8ecea; }
 .status.rejected, .status.cancelled, .status.disabled { color: #8e332d; background: var(--red-soft); }
 .empty-state { display: grid; place-items: center; min-height: 250px; padding: 30px; color: var(--muted); text-align: center; border: 1px dashed #bdc6c3; border-radius: 18px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }

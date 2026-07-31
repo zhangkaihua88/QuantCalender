@@ -16,6 +16,8 @@ const error = ref('')
 const form = reactive({ title:'', meetingDate:'', shareUrl:'', accessCode:'', note:'' })
 
 const groupId = computed(() => typeof route.query.group === 'string' ? route.query.group : null)
+const requestedEventId = computed(() => typeof route.query.eventId === 'string' ? route.query.eventId : '')
+const requestedOccurrenceKey = computed(() => typeof route.query.occurrenceKey === 'string' ? route.query.occurrenceKey : '')
 
 function shanghaiDate(value: string) {
   return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(value))
@@ -40,6 +42,17 @@ onMounted(async () => {
         if (seen.has(key)) return false
         seen.add(key); return true
       }).sort((left, right) => right.startUtc.localeCompare(left.startUtc))
+      if (Boolean(requestedEventId.value) !== Boolean(requestedOccurrenceKey.value)) {
+        error.value = '关联会议参数不完整，请从历史会议重新进入。'
+      } else if (requestedEventId.value && requestedOccurrenceKey.value) {
+        const match = occurrences.value.find((item) => item.eventId === requestedEventId.value && item.occurrenceKey === requestedOccurrenceKey.value)
+        if (match) {
+          selectedOccurrence.value = `${match.eventId}|${match.occurrenceKey}`
+          chooseOccurrence()
+        } else {
+          error.value = '会议场次不存在或超出可关联的 180 天范围。'
+        }
+      }
     }
   } catch (caught) { error.value = caught instanceof ApiError ? caught.message : '投稿页面加载失败' }
   finally { loading.value = false }

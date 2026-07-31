@@ -137,14 +137,14 @@ app.post('/v1/session/member', async (context) => {
   if (!limit.allowed) return apiError(context, 429, 'TOO_MANY_ATTEMPTS', `尝试次数过多，请在 ${Math.ceil(limit.retryAfter / 60)} 分钟后重试`)
   if (!await verifyTurnstile(context.env, parsed.data.turnstileToken, remoteIp)) {
     await recordLoginFailure(context.env, rateKey)
-    return apiError(context, 401, 'LOGIN_FAILED', 'WQ_ID 不存在或当前不可用')
+    return apiError(context, 401, 'LOGIN_FAILED', '登录失败，请检查 WQ_ID 和人机验证')
   }
   const wqHash = await hmacSha256(wqId, context.env.WQ_ID_HMAC_SECRET)
   const member = await context.env.DB.prepare("SELECT id, wq_id_hint, country, public_wq_id FROM members WHERE wq_id_hash = ?1 AND active = 1 AND country IN ('CN', 'HK')")
     .bind(wqHash).first<{ id: string; wq_id_hint: string; country: 'CN' | 'HK'; public_wq_id: number }>()
   if (!member) {
     await recordLoginFailure(context.env, rateKey)
-    return apiError(context, 401, 'LOGIN_FAILED', 'WQ_ID 不存在或当前不可用')
+    return apiError(context, 401, 'LOGIN_FAILED', '登录失败，请检查 WQ_ID 和人机验证')
   }
   await clearLoginFailures(context.env, rateKey)
   await context.env.DB.prepare('UPDATE members SET wq_id_ciphertext = COALESCE(wq_id_ciphertext, ?2), updated_at = ?3 WHERE id = ?1')
@@ -166,7 +166,7 @@ app.post('/v1/session/admin', async (context) => {
     && await verifyTurnstile(context.env, parsed.data.turnstileToken, remoteIp)
   if (!valid) {
     await recordLoginFailure(context.env, rateKey)
-    return apiError(context, 401, 'LOGIN_FAILED', '管理员凭据不正确')
+    return apiError(context, 401, 'LOGIN_FAILED', '登录失败，请检查管理员凭据和人机验证')
   }
   await clearLoginFailures(context.env, rateKey)
   const created = await createSession(context, 'admin', null)

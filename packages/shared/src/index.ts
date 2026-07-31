@@ -84,6 +84,10 @@ export const calendarFeedSchema = z.object({
 
 export const replayStatusSchema = z.enum(['pending', 'published', 'rejected', 'disabled'])
 export const replayProviderSchema = z.enum(['baidu', 'quark', 'aliyun', 'onedrive', 'google_drive', 'dropbox', 'weiyun', 'other'])
+export const replayOccurrenceQuerySchema = z.object({
+  eventId: z.string().uuid(),
+  occurrenceKey: z.string().datetime()
+})
 
 export const replayInputSchema = z.object({
   groupId: z.string().uuid().nullable().default(null),

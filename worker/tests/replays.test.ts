@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { replayInputSchema } from '@wq-calendar/shared'
-import { canonicalReplayUrl, detectReplayProvider } from '../src/replays'
+import { canonicalReplayUrl, detectReplayProvider, parseReplayOccurrenceFilter } from '../src/replays'
 import { hiddenMemberIdentity, visibleMemberIdentity } from '../src/identity'
 import { encryptWqId } from '../src/crypto'
 import type { Env } from '../src/env'
@@ -24,6 +24,15 @@ describe('replay link handling', () => {
     expect(replayInputSchema.safeParse({ ...valid, shareUrl:'https://user:pass@example.com/replay' }).success).toBe(false)
     expect(replayInputSchema.safeParse({ ...valid, meetingDate:'2026-02-30' }).success).toBe(false)
     expect(replayInputSchema.safeParse({ ...valid, eventId:crypto.randomUUID(), occurrenceKey:null }).success).toBe(false)
+  })
+
+  it('validates exact occurrence filters as a complete pair', () => {
+    const eventId = crypto.randomUUID()
+    const occurrenceKey = '2026-07-24T10:00:00Z'
+    expect(parseReplayOccurrenceFilter('', '')).toEqual({ success:true, data:null })
+    expect(parseReplayOccurrenceFilter(eventId, occurrenceKey)).toEqual({ success:true, data:{ eventId, occurrenceKey } })
+    expect(parseReplayOccurrenceFilter(eventId, '')).toEqual({ success:false, reason:'pair' })
+    expect(parseReplayOccurrenceFilter('not-a-uuid', occurrenceKey)).toEqual({ success:false, reason:'invalid' })
   })
 })
 
