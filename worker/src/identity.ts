@@ -7,10 +7,6 @@ export type MemberIdentityRow = {
   public_wq_id: number | null
 }
 
-export type LeaderboardIdentityRow = MemberIdentityRow & {
-  wq_id_hash: string
-}
-
 export function hiddenMemberIdentity(wqId: string): string {
   const letters = normalizeWqId(wqId).match(/[A-Z]/g)?.slice(0, 2).join('') || ''
   return letters || '成员'
@@ -29,11 +25,4 @@ export async function visibleMemberIdentity(row: MemberIdentityRow | null, env: 
   }
   const safeLegacyHint = row.wq_id_hint?.match(/^[A-Z]{1,2}$/)?.[0]
   return { wqId: safeLegacyHint || '成员', hasFullWqId: false }
-}
-
-export async function visibleLeaderboardIdentity(row: LeaderboardIdentityRow, env: Env, viewerRole: Role, adminWqHash: string) {
-  if (row.wq_id_hash === adminWqHash) {
-    return { wqId: normalizeWqId(env.ADMIN_WQ_ID), hasFullWqId: true }
-  }
-  return visibleMemberIdentity(row, env, viewerRole)
 }

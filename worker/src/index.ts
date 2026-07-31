@@ -31,7 +31,7 @@ import { decryptWqId, encryptWqId, hmacSha256, normalizeWqId, randomToken, sha25
 import { audit, listEventExceptions, listPublishedEvents } from './db'
 import { expandEvent, normalizeMeetingTimes, publicEvent, type EventRow } from './events'
 import { buildCalendarIcs } from './ics'
-import { visibleLeaderboardIdentity } from './identity'
+import { visibleMemberIdentity } from './identity'
 import { publishedReplayOccurrenceKeys, registerReplayRoutes, replayOccurrenceIdentity } from './replays'
 
 type Variables = { session: SessionRecord }
@@ -261,7 +261,6 @@ app.get('/v1/meetings/:id', requireAuth(), async (context) => {
 app.get('/v1/leaderboard', requireAuth(), async (context) => {
   type LeaderboardRow = {
     member_id: string
-    wq_id_hash: string
     wq_id_hint: string
     wq_id_ciphertext: string | null
     public_wq_id: number
@@ -276,7 +275,6 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
   const requestedPage = Number(context.req.query('page') || 1)
   const requestedPageSize = Number(context.req.query('pageSize') || 50)
   const pageSize = [25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
-  const adminWqHash = await hmacSha256(normalizeWqId(context.env.ADMIN_WQ_ID), context.env.WQ_ID_HMAC_SECRET)
   const summary = kind === 'replay'
     ? await context.env.DB.prepare(`
         SELECT COUNT(DISTINCT rl.submitter_member_id) AS contributor_count,
@@ -301,31 +299,31 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
   const offset = (page - 1) * pageSize
   const result = kind === 'replay'
     ? await context.env.DB.prepare(`
-        SELECT m.id AS member_id, m.wq_id_hash, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
+        SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
           COUNT(rl.id) AS submission_count,
           COALESCE(SUM(CASE WHEN rl.approved_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count,
           COUNT(DISTINCT CASE WHEN rl.approved_at IS NOT NULL THEN rl.group_id END) AS contributed_meeting_count
         FROM replay_links rl
         JOIN members m ON m.id = rl.submitter_member_id
         WHERE rl.submitter_member_id IS NOT NULL AND m.active = 1
-        GROUP BY m.id, m.wq_id_hash, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
+        GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
         ORDER BY contributed_meeting_count DESC, approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
         LIMIT ?1 OFFSET ?2
       `).bind(pageSize, offset).all<LeaderboardRow>()
     : await context.env.DB.prepare(`
-        SELECT m.id AS member_id, m.wq_id_hash, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
+        SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
           COUNT(e.id) AS submission_count,
           COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
         FROM events e
         JOIN members m ON m.id = e.submitter_member_id
         WHERE e.submitter_member_id IS NOT NULL AND m.active = 1
-        GROUP BY m.id, m.wq_id_hash, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
+        GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
         ORDER BY approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
         LIMIT ?1 OFFSET ?2
       `).bind(pageSize, offset).all<LeaderboardRow>()
   const session = context.get('session')
   const entries = await Promise.all(result.results.map(async (row, index) => {
-    const identity = await visibleLeaderboardIdentity(row, context.env, session.role, adminWqHash)
+    const identity = await visibleMemberIdentity(row, context.env, session.role)
     return {
       rank: offset + index + 1,
       memberId: row.member_id,

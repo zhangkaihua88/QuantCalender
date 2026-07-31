@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { replayInputSchema } from '@wq-calendar/shared'
 import { canonicalReplayUrl, detectReplayProvider, parseReplayOccurrenceFilter, publishedReplayOccurrenceKeys } from '../src/replays'
-import { hiddenMemberIdentity, visibleLeaderboardIdentity, visibleMemberIdentity } from '../src/identity'
-import { encryptWqId, hmacSha256 } from '../src/crypto'
+import { hiddenMemberIdentity, visibleMemberIdentity } from '../src/identity'
+import { encryptWqId } from '../src/crypto'
 import type { Env } from '../src/env'
 
 describe('replay link handling', () => {
@@ -63,17 +63,15 @@ describe('member identity visibility', () => {
     expect(hiddenMemberIdentity('a1b234')).toBe('AB')
   })
 
-  it('always shows the configured administrator ID on leaderboards', async () => {
+  it('applies the visibility preference to an administrator WQ_ID listed as a member', async () => {
     const secret = 'identity-test-secret'
-    const adminWqId = 'KZ79256'
-    const adminWqHash = await hmacSha256(adminWqId, secret)
-    const env = { ADMIN_WQ_ID:adminWqId, WQ_ID_HMAC_SECRET:secret } as Env
-    const identity = await visibleLeaderboardIdentity({
-      wq_id_hash:adminWqHash,
+    const env = { ADMIN_WQ_ID:'KZ79256', WQ_ID_HMAC_SECRET:secret } as Env
+    const row = {
       wq_id_hint:'••••9256',
-      wq_id_ciphertext:null,
+      wq_id_ciphertext:await encryptWqId('KZ79256', secret),
       public_wq_id:0
-    }, env, 'member', adminWqHash)
-    expect(identity).toEqual({ wqId:'KZ79256', hasFullWqId:true })
+    }
+    expect(await visibleMemberIdentity(row, env, 'member')).toEqual({ wqId:'KZ', hasFullWqId:false })
+    expect(await visibleMemberIdentity(row, env, 'admin')).toEqual({ wqId:'KZ79256', hasFullWqId:true })
   })
 })
