@@ -98,6 +98,31 @@ export function parseReplayOccurrenceFilter(eventId: string, occurrenceKey: stri
   return { success:true as const, data:parsed.data }
 }
 
+export function replayOccurrenceIdentity(eventId: string, occurrenceKey: string): string {
+  return `${eventId}:${occurrenceKey}`
+}
+
+export async function publishedReplayOccurrenceKeys(env: Env, eventIds: string[]): Promise<Set<string>> {
+  const uniqueEventIds = [...new Set(eventIds)]
+  if (!uniqueEventIds.length) return new Set()
+
+  const chunks = Array.from({ length:Math.ceil(uniqueEventIds.length / 80) }, (_, index) => uniqueEventIds.slice(index * 80, (index + 1) * 80))
+  const statements = chunks.map((chunk) => {
+    const placeholders = chunk.map((_, index) => `?${index + 1}`).join(', ')
+    return env.DB.prepare(`
+      SELECT DISTINCT rg.event_id, rg.occurrence_key
+      FROM replay_groups rg
+      WHERE rg.event_id IN (${placeholders}) AND rg.occurrence_key IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM replay_links rl
+          WHERE rl.group_id = rg.id AND rl.status = 'published'
+        )
+    `).bind(...chunk)
+  })
+  const results = await env.DB.batch<{ event_id: string; occurrence_key: string }>(statements)
+  return new Set(results.flatMap((result) => result.results.map((row) => replayOccurrenceIdentity(row.event_id, row.occurrence_key))))
+}
+
 function parsePage(value: string | undefined): number {
   const parsed = Number(value || 1)
   return Number.isFinite(parsed) ? Math.max(1, Math.trunc(parsed)) : 1

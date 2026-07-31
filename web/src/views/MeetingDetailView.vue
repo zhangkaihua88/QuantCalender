@@ -9,9 +9,22 @@ const route = useRoute()
 const meeting = ref<any>(null)
 const error = ref('')
 const alarm = ref(30)
+const replayAvailability = ref<'idle' | 'loading' | 'available' | 'unavailable' | 'error'>('idle')
 
 onMounted(async () => {
-  try { meeting.value = (await api<{ meeting: any }>(`/v1/meetings/${route.params.id}`)).meeting }
+  try {
+    meeting.value = (await api<{ meeting: any }>(`/v1/meetings/${route.params.id}`)).meeting
+    if (occurrenceEnded.value && occurrenceKey.value) {
+      replayAvailability.value = 'loading'
+      try {
+        const params = new URLSearchParams({ eventId:String(route.params.id), occurrenceKey:String(occurrenceKey.value), page:'1' })
+        const data = await api<{ groups: unknown[] }>(`/v1/replays?${params}`)
+        replayAvailability.value = data.groups.length ? 'available' : 'unavailable'
+      } catch {
+        replayAvailability.value = 'error'
+      }
+    }
+  }
   catch (caught) { error.value = caught instanceof ApiError ? caught.message : '会议加载失败' }
 })
 
@@ -42,7 +55,7 @@ const replaySubmitLink = computed(() => ({ path:'/replays/submit', query:{ event
         <div class="divider"></div>
         <h2>会议说明</h2><p class="detail-copy">{{ meeting.description || meeting.summary }}</p>
         <div class="divider"></div>
-        <div v-if="occurrenceEnded" class="inline"><RouterLink class="button secondary" :to="replayLink"><PlayCircle :size="17" />查看回放</RouterLink><RouterLink v-if="session.user?.role === 'member'" class="button" :to="replaySubmitLink"><Upload :size="17" />投稿回放</RouterLink></div>
+        <div v-if="occurrenceEnded" class="inline"><RouterLink v-if="replayAvailability === 'available'" class="button secondary" :to="replayLink"><PlayCircle :size="17" />查看回放</RouterLink><span v-else-if="replayAvailability === 'loading'" class="muted">正在检查回放…</span><span v-else-if="replayAvailability === 'error'" class="muted">暂时无法确认回放</span><span v-else class="muted">暂无回放</span><RouterLink v-if="session.user?.role === 'member'" class="button" :to="replaySubmitLink"><Upload :size="17" />投稿回放</RouterLink></div>
         <div v-else class="inline"><a class="button" :class="{ disabled: occurrenceStatus === 'cancelled' }" :href="occurrenceStatus === 'cancelled' ? undefined : meeting.registrationUrl" target="_blank" rel="noopener noreferrer"><ExternalLink :size="17" />前往注册</a><a class="button secondary" :href="calendarUrl" target="_blank" rel="noopener noreferrer"><CalendarPlus :size="17" />添加到 Google</a></div>
       </section>
       <aside class="stack">

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { replayInputSchema } from '@wq-calendar/shared'
-import { canonicalReplayUrl, detectReplayProvider, parseReplayOccurrenceFilter } from '../src/replays'
-import { hiddenMemberIdentity, visibleMemberIdentity } from '../src/identity'
-import { encryptWqId } from '../src/crypto'
+import { canonicalReplayUrl, detectReplayProvider, parseReplayOccurrenceFilter, publishedReplayOccurrenceKeys } from '../src/replays'
+import { hiddenMemberIdentity, visibleLeaderboardIdentity, visibleMemberIdentity } from '../src/identity'
+import { encryptWqId, hmacSha256 } from '../src/crypto'
 import type { Env } from '../src/env'
 
 describe('replay link handling', () => {
@@ -34,6 +34,21 @@ describe('replay link handling', () => {
     expect(parseReplayOccurrenceFilter(eventId, '')).toEqual({ success:false, reason:'pair' })
     expect(parseReplayOccurrenceFilter('not-a-uuid', occurrenceKey)).toEqual({ success:false, reason:'invalid' })
   })
+
+  it('loads only published replay availability for linked event occurrences', async () => {
+    let query = ''
+    let values: unknown[] = []
+    const statement = { bind:(...bound: unknown[]) => { values = bound; return statement } }
+    const env = { DB:{
+      prepare:(sql: string) => { query = sql; return statement },
+      batch:async () => [{ results:[{ event_id:'event-1', occurrence_key:'2026-07-24T10:00:00Z' }] }]
+    } } as unknown as Env
+
+    const keys = await publishedReplayOccurrenceKeys(env, ['event-1', 'event-1'])
+    expect([...keys]).toEqual(['event-1:2026-07-24T10:00:00Z'])
+    expect(query).toContain("rl.status = 'published'")
+    expect(values).toEqual(['event-1'])
+  })
 })
 
 describe('member identity visibility', () => {
@@ -46,5 +61,19 @@ describe('member identity visibility', () => {
     expect(await visibleMemberIdentity({ ...row, public_wq_id:0 }, env, 'admin')).toEqual({ wqId:'KZ12345', hasFullWqId:true })
     expect(await visibleMemberIdentity({ ...row, wq_id_ciphertext:null, public_wq_id:0 }, env, 'member')).toEqual({ wqId:'成员', hasFullWqId:false })
     expect(hiddenMemberIdentity('a1b234')).toBe('AB')
+  })
+
+  it('always shows the configured administrator ID on leaderboards', async () => {
+    const secret = 'identity-test-secret'
+    const adminWqId = 'KZ79256'
+    const adminWqHash = await hmacSha256(adminWqId, secret)
+    const env = { ADMIN_WQ_ID:adminWqId, WQ_ID_HMAC_SECRET:secret } as Env
+    const identity = await visibleLeaderboardIdentity({
+      wq_id_hash:adminWqHash,
+      wq_id_hint:'••••9256',
+      wq_id_ciphertext:null,
+      public_wq_id:0
+    }, env, 'member', adminWqHash)
+    expect(identity).toEqual({ wqId:'KZ79256', hasFullWqId:true })
   })
 })

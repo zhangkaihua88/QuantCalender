@@ -102,7 +102,7 @@ describe('CalendarView', () => {
     const base = {
       summary:'周期培训', organizer:'WQ', speaker:'', category:'培训', meetingLanguage:'zh' as const,
       locationType:'online' as const, locationText:'线上会议', registrationUrl:'https://example.com/register',
-      sourceTimezone:'Asia/Shanghai', isException:false
+      sourceTimezone:'Asia/Shanghai', isException:false, hasReplay:false
     }
     vi.mocked(api)
       .mockResolvedValueOnce({ occurrences:[{
@@ -111,7 +111,7 @@ describe('CalendarView', () => {
       }] })
       .mockResolvedValueOnce({ occurrences:[{
         ...base, eventId:'11111111-1111-4111-8111-111111111111', occurrenceKey:'2026-07-24T12:00:00Z', title:'周期培训',
-        startUtc:'2026-07-24T12:00:00Z', endUtc:'2026-07-24T13:00:00Z', status:'published'
+        startUtc:'2026-07-24T12:00:00Z', endUtc:'2026-07-24T13:00:00Z', status:'published', hasReplay:true
       }, {
         ...base, eventId:'11111111-1111-4111-8111-111111111111', occurrenceKey:'2026-07-17T12:00:00Z', title:'周期培训',
         startUtc:'2026-07-17T12:00:00Z', endUtc:'2026-07-17T13:00:00Z', status:'published'
@@ -132,6 +132,8 @@ describe('CalendarView', () => {
       expect(wrapper.text()).toContain('已结束')
       expect(wrapper.text()).toContain('已取消')
       expect(wrapper.text()).toContain('查看回放')
+      expect(wrapper.text()).toContain('暂无回放')
+      expect(wrapper.findAll('.agenda-actions').filter((actions) => actions.text().includes('查看回放'))).toHaveLength(1)
       expect(wrapper.text()).toContain('投稿回放')
       expect(wrapper.text()).not.toContain('立即注册')
 

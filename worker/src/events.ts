@@ -114,7 +114,8 @@ export function expandEvent(event: EventRow, exceptions: ExceptionRow[], from: s
       startUtc: startInstant.toString(),
       endUtc: endInstant.toString(),
       status,
-      isException: Boolean(exception)
+      isException: Boolean(exception),
+      hasReplay: false
     })
   }
   return result

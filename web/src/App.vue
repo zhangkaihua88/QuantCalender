@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarDays, CircleHelp, Github, LogOut, PlayCircle, Settings, ShieldCheck, Trophy } from 'lucide-vue-next'
+import { CalendarDays, CircleHelp, Github, LogOut, PlayCircle, Settings, ShieldCheck, Trophy, Video } from 'lucide-vue-next'
 import { logout, session } from './state'
 
 const route = useRoute()
@@ -35,6 +35,9 @@ async function signOut() {
       <div class="user-actions">
         <a class="github-link" href="https://github.com/zhangkaihua88/QuantCalender" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 QuantCalender 项目">
           <Github :size="18" /><span>GitHub</span>
+        </a>
+        <a class="github-link" href="https://github.com/AlphaQuantKit/WebMeetRecorder" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 Zoom 会议录制工具" title="Zoom 会议录制工具">
+          <Video :size="18" /><span>Zoom 录制</span>
         </a>
         <span class="member-pill">{{ session.user?.wqIdHint }}</span>
         <button class="icon-button" type="button" aria-label="退出登录" @click="signOut"><LogOut :size="18" /></button>

@@ -151,6 +151,7 @@ export interface MeetingOccurrence {
   endUtc: string
   status: 'published' | 'cancelled'
   isException: boolean
+  hasReplay: boolean
 }
 
 export interface LeaderboardEntry {

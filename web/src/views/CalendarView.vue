@@ -239,7 +239,8 @@ async function submitMeeting(meeting: MeetingInput) {
           <div class="agenda-actions">
             <RouterLink :to="detailLink(item)" class="button secondary"><Eye :size="16" />查看详情</RouterLink>
             <template v-if="timeScope === 'history'">
-              <RouterLink :to="replayLink(item)" class="button secondary"><PlayCircle :size="16" />查看回放</RouterLink>
+              <RouterLink v-if="item.hasReplay" :to="replayLink(item)" class="button secondary"><PlayCircle :size="16" />查看回放</RouterLink>
+              <span v-else class="muted">暂无回放</span>
               <RouterLink v-if="session.user?.role === 'member'" :to="replaySubmitLink(item)" class="button"><Upload :size="16" />投稿回放</RouterLink>
             </template>
             <a v-else-if="item.status !== 'cancelled'" class="button" :href="item.registrationUrl" target="_blank" rel="noopener noreferrer"><ExternalLink :size="16" />立即注册</a>
