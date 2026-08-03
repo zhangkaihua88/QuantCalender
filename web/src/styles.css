@@ -200,6 +200,15 @@ h3 { margin-bottom: 8px; font-size: 17px; }
 .preference-toggle input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--teal); }
 .preference-toggle span, .preference-toggle strong, .preference-toggle small { display: block; }
 .preference-toggle small { margin-top: 5px; color: var(--muted); line-height: 1.5; }
+.calendar-content-settings { display: grid; gap: 13px; min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.calendar-content-settings legend { padding: 0 7px; color: #3c5264; font-size: 13px; font-weight: 800; }
+.calendar-content-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.calendar-content-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.calendar-content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.calendar-content-option { display: flex; align-items: flex-start; gap: 11px; min-height: 72px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); cursor: pointer; }
+.calendar-content-option input { flex: 0 0 auto; width: 19px; height: 19px; margin: 1px 0 0; accent-color: var(--teal); }
+.calendar-content-option span, .calendar-content-option strong, .calendar-content-option small { display: block; }
+.calendar-content-option small { margin-top: 4px; color: var(--muted); line-height: 1.45; }
 .submission-switch, .leaderboard-switch { width: max-content; margin-bottom: 20px; }
 .review-note { margin-top: 8px !important; color: #8e5c25 !important; }
 
@@ -299,6 +308,8 @@ h3 { margin-bottom: 8px; font-size: 17px; }
   .calendar-page-actions { width: 100%; justify-content: space-between; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
+  .calendar-content-head { align-items: flex-start; flex-direction: column; }
+  .calendar-content-grid { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }
   .filters input { grid-column: 1 / -1; }
   .hero-meeting { grid-template-columns: 92px 1fr; gap: 15px; padding: 19px; }

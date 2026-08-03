@@ -26,7 +26,7 @@ export const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日�
   const [year, month, day] = value.split('-').map(Number)
   const date = new Date(Date.UTC(year!, month! - 1, day!))
   return date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
-}, '会议日期无效')
+}, '日期无效')
 
 export const meetingInputSchema = z.object({
   title: z.string().trim().min(2).max(120),
@@ -78,8 +78,25 @@ export const exceptionSchema = z.object({
   }
 })
 
+export const calendarContentSelectionSchema = z.object({
+  meetings: z.boolean().default(true),
+  ppa: z.boolean().default(true),
+  competition: z.boolean().default(true),
+  bonus: z.boolean().default(true)
+})
+
+export type CalendarContentSelection = z.infer<typeof calendarContentSelectionSchema>
+
+export const defaultCalendarContentSelection: CalendarContentSelection = {
+  meetings: true,
+  ppa: true,
+  competition: true,
+  bonus: true
+}
+
 export const calendarFeedSchema = z.object({
-  alarmMinutes: z.union([z.literal(0), z.literal(10), z.literal(30), z.literal(60), z.literal(1440)]).default(30)
+  alarmMinutes: z.union([z.literal(0), z.literal(10), z.literal(30), z.literal(60), z.literal(1440)]).default(30),
+  contentSelection: calendarContentSelectionSchema.default(defaultCalendarContentSelection)
 })
 
 export const replayStatusSchema = z.enum(['pending', 'published', 'rejected', 'disabled'])
@@ -165,7 +182,7 @@ export const importantItemInputSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['contentMarkdown'], message: '请填写事项内容' })
   }
   if (value.kind !== 'bonus' && (value.announcementDate || value.paymentDate)) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['announcementDate'], message: '只有奖金日程可以设置公布和发放日期' })
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['announcementDate'], message: '只有奖金日程可以设置公布和账单日期' })
   }
 })
 

@@ -105,7 +105,7 @@ async function cancelItem(item: ImportantItem) {
       <article v-for="item in visibleItems" :key="item.id" class="card card-body important-admin-card">
         <div class="page-head important-admin-head"><div><div class="inline"><span class="tag">{{ KIND_LABELS[item.kind] }}</span><span class="status" :class="item.status">{{ STATUS_LABELS[item.status] }}</span></div><h3>{{ item.title }}</h3><p class="muted">{{ item.startDate }}—{{ item.endDate }}</p></div><button v-if="['draft','pending','published'].includes(item.status)" class="button secondary small" type="button" @click="editItem(item)"><Pencil :size="15" />编辑</button></div>
         <MarkdownContent v-if="item.contentMarkdown" :content="item.contentMarkdown" />
-        <div v-if="item.kind === 'bonus'" class="bonus-dates"><div><span>公布日期</span><strong>{{ item.announcementDate || '待确定' }}</strong></div><div><span>发放日期</span><strong>{{ item.paymentDate || '待确定' }}</strong></div></div>
+        <div v-if="item.kind === 'bonus'" class="bonus-dates"><div><span>公布日期</span><strong>{{ item.announcementDate || '待确定' }}</strong></div><div><span>账单日期</span><strong>{{ item.paymentDate || '待确定' }}</strong></div></div>
         <template v-if="item.status === 'pending'">
           <div class="field" style="margin-top:14px"><label>给投稿人的反馈（可选）</label><textarea v-model="reviewNotes[item.id]" maxlength="1000" /></div>
           <div class="inline" style="margin-top:12px"><button class="button" type="button" @click="decide(item,'publish')">通过并发布</button><button class="button danger" type="button" @click="decide(item,'reject')">拒绝</button></div>

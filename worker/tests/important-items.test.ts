@@ -54,9 +54,18 @@ describe('important item ICS', () => {
     expect(output).not.toContain('UID:bonus-1@wq-meeting-calendar')
     expect(output).toContain('SUMMARY:奖金公布 · 季度薪酬')
     expect(output).toContain('DTSTART;VALUE=DATE:20261124')
-    expect(output).toContain('SUMMARY:奖金发放 · 季度薪酬')
+    expect(output).toContain('SUMMARY:奖金账单 · 季度薪酬')
     expect(output).toContain('DTSTART;VALUE=DATE:20261231')
     expect(output).toContain('STATUS:CANCELLED')
+    expect(output).not.toContain('BEGIN:VALARM')
+  })
+
+  it('filters important item categories without adding alarms', () => {
+    const output = buildCalendarIcs([], [], 30, [baseItem], [], {
+      meetings:true, ppa:false, competition:true, bonus:true
+    })
+    expect(output).not.toContain('UID:item-1@wq-meeting-calendar')
+    expect(output).not.toContain('BEGIN:VALARM')
   })
 
   it('converts supported markdown to readable calendar text', () => {

@@ -1,5 +1,5 @@
 import { Temporal } from '@js-temporal/polyfill'
-import type { Recurrence } from '@wq-calendar/shared'
+import { defaultCalendarContentSelection, type CalendarContentSelection, type Recurrence } from '@wq-calendar/shared'
 import type { EventRow, ExceptionRow } from './events'
 import type { ImportantItemCalendarDateRow, ImportantItemRow } from './important-items'
 
@@ -147,7 +147,7 @@ function importantRangeLines(item: ImportantItemRow): string[] {
 }
 
 function importantMilestoneLines(item: ImportantItemRow, date: ImportantItemCalendarDateRow): string[] {
-  const label = date.date_kind === 'announcement' ? '奖金公布' : '奖金发放'
+  const label = date.date_kind === 'announcement' ? '奖金公布' : '奖金账单'
   const cancelled = item.status === 'cancelled' || date.status === 'cancelled'
   return [
     'BEGIN:VEVENT',
@@ -170,7 +170,8 @@ export function buildCalendarIcs(
   exceptions: ExceptionRow[],
   alarmMinutes = 30,
   importantItems: ImportantItemRow[] = [],
-  importantDates: ImportantItemCalendarDateRow[] = []
+  importantDates: ImportantItemCalendarDateRow[] = [],
+  contentSelection: CalendarContentSelection = defaultCalendarContentSelection
 ): string {
   const lines = [
     'BEGIN:VCALENDAR',
@@ -181,15 +182,18 @@ export function buildCalendarIcs(
     'X-WR-CALNAME:WQ Calendar',
     'X-WR-TIMEZONE:Asia/Shanghai'
   ]
-  for (const event of events) {
-    lines.push(...baseEventLines(event, alarmMinutes))
-    for (const exception of exceptions.filter((item) => item.event_id === event.id)) {
-      lines.push(...exceptionLines(event, exception, alarmMinutes))
+  if (contentSelection.meetings) {
+    for (const event of events) {
+      lines.push(...baseEventLines(event, alarmMinutes))
+      for (const exception of exceptions.filter((item) => item.event_id === event.id)) {
+        lines.push(...exceptionLines(event, exception, alarmMinutes))
+      }
     }
   }
   for (const item of importantItems) {
-    if (item.kind !== 'bonus') lines.push(...importantRangeLines(item))
-    if (item.kind === 'bonus') {
+    if (item.kind === 'ppa' && contentSelection.ppa) lines.push(...importantRangeLines(item))
+    if (item.kind === 'competition' && contentSelection.competition) lines.push(...importantRangeLines(item))
+    if (item.kind === 'bonus' && contentSelection.bonus) {
       for (const date of importantDates.filter((entry) => entry.item_id === item.id)) {
         lines.push(...importantMilestoneLines(item, date))
       }

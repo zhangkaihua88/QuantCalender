@@ -18,6 +18,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Validate D1 migrations locally
+        working-directory: worker
+        run: pnpm exec wrangler d1 migrations apply wq-meeting-calendar --local
       - run: pnpm check
       - name: Reject committed secrets
         shell: bash

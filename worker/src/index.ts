@@ -10,7 +10,7 @@ import {
   meetingInputSchema,
   memberLoginSchema
 } from '@wq-calendar/shared'
-import type { MeetingInput } from '@wq-calendar/shared'
+import type { CalendarContentSelection, MeetingInput } from '@wq-calendar/shared'
 import type { Env, SessionRecord } from './env'
 import { allowedOrigins, apiError, readJson } from './http'
 import {
@@ -702,33 +702,63 @@ app.get('/v1/admin/member-usage', requireAuth('admin'), async (context) => {
 
 app.get('/v1/calendar-feed', requireAuth('member'), async (context) => {
   const session = context.get('session')
-  const row = await context.env.DB.prepare('SELECT alarm_minutes, created_at, updated_at FROM calendar_tokens WHERE member_id = ?1 AND revoked_at IS NULL').bind(session.member_id).first()
-  return context.json({ feed: row ? { exists: true, ...row } : { exists: false, alarm_minutes: 30 } })
+  const row = await context.env.DB.prepare(`
+    SELECT alarm_minutes, include_meetings, include_ppa, include_competition, include_bonus, created_at, updated_at
+    FROM calendar_tokens WHERE member_id = ?1 AND revoked_at IS NULL
+  `).bind(session.member_id).first()
+  return context.json({ feed: row ? { exists: true, ...row } : {
+    exists: false,
+    alarm_minutes: 30,
+    include_meetings: 1,
+    include_ppa: 1,
+    include_competition: 1,
+    include_bonus: 1
+  } })
 })
 
 app.post('/v1/calendar-feed', requireAuth('member'), async (context) => {
   const session = context.get('session')
   if (!await verifyMutation(context, session)) return apiError(context, 403, 'CSRF_FAILED', '安全校验失败')
   const parsed = calendarFeedSchema.safeParse(await readJson(context))
-  if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '提醒时间无效')
+  if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '日历订阅设置无效')
   const token = randomToken()
   const now = Date.now()
+  const selection = parsed.data.contentSelection
   await context.env.DB.prepare(`
-    INSERT INTO calendar_tokens (id, member_id, token_hash, alarm_minutes, created_at, updated_at, revoked_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?5, NULL)
+    INSERT INTO calendar_tokens (
+      id, member_id, token_hash, alarm_minutes, include_meetings, include_ppa, include_competition, include_bonus,
+      created_at, updated_at, revoked_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, NULL)
     ON CONFLICT(member_id) DO UPDATE SET token_hash = excluded.token_hash, alarm_minutes = excluded.alarm_minutes,
+      include_meetings = excluded.include_meetings, include_ppa = excluded.include_ppa,
+      include_competition = excluded.include_competition, include_bonus = excluded.include_bonus,
       updated_at = excluded.updated_at, revoked_at = NULL
-  `).bind(crypto.randomUUID(), session.member_id, await sha256(token), parsed.data.alarmMinutes, now).run()
-  await audit(context.env, session, 'rotate', 'calendar_feed', session.member_id!)
-  return context.json({ url: `${context.env.API_BASE_URL.replace(/\/$/, '')}/ics/${token}/calendar.ics`, alarmMinutes: parsed.data.alarmMinutes })
+  `).bind(
+    crypto.randomUUID(), session.member_id, await sha256(token), parsed.data.alarmMinutes,
+    selection.meetings ? 1 : 0, selection.ppa ? 1 : 0, selection.competition ? 1 : 0, selection.bonus ? 1 : 0, now
+  ).run()
+  await audit(context.env, session, 'rotate', 'calendar_feed', session.member_id!, { contentSelection: selection })
+  return context.json({
+    url: `${context.env.API_BASE_URL.replace(/\/$/, '')}/ics/${token}/calendar.ics`,
+    alarmMinutes: parsed.data.alarmMinutes,
+    contentSelection: selection
+  })
 })
 
 app.patch('/v1/calendar-feed', requireAuth('member'), async (context) => {
   const session = context.get('session')
   if (!await verifyMutation(context, session)) return apiError(context, 403, 'CSRF_FAILED', '安全校验失败')
   const parsed = calendarFeedSchema.safeParse(await readJson(context))
-  if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '提醒时间无效')
-  const result = await context.env.DB.prepare('UPDATE calendar_tokens SET alarm_minutes = ?2, updated_at = ?3 WHERE member_id = ?1 AND revoked_at IS NULL').bind(session.member_id, parsed.data.alarmMinutes, Date.now()).run()
+  if (!parsed.success) return apiError(context, 422, 'VALIDATION_ERROR', '日历提醒设置无效')
+  const selection = parsed.data.contentSelection
+  const result = await context.env.DB.prepare(`
+    UPDATE calendar_tokens SET alarm_minutes = ?2, include_meetings = ?3, include_ppa = ?4,
+      include_competition = ?5, include_bonus = ?6, updated_at = ?7
+    WHERE member_id = ?1 AND revoked_at IS NULL
+  `).bind(
+    session.member_id, parsed.data.alarmMinutes, selection.meetings ? 1 : 0, selection.ppa ? 1 : 0,
+    selection.competition ? 1 : 0, selection.bonus ? 1 : 0, Date.now()
+  ).run()
   if (!result.meta.changes) return apiError(context, 404, 'NO_FEED', '请先生成订阅地址')
   return context.json({ updated: true })
 })
@@ -743,14 +773,28 @@ app.delete('/v1/calendar-feed', requireAuth('member'), async (context) => {
 app.get('/ics/:token/calendar.ics', async (context) => {
   const tokenHash = await sha256(context.req.param('token'))
   const token = await context.env.DB.prepare(`
-    SELECT ct.alarm_minutes FROM calendar_tokens ct
+    SELECT ct.alarm_minutes, ct.include_meetings, ct.include_ppa, ct.include_competition, ct.include_bonus
+    FROM calendar_tokens ct
     JOIN members m ON m.id = ct.member_id
     WHERE ct.token_hash = ?1 AND ct.revoked_at IS NULL AND m.active = 1
-  `).bind(tokenHash).first<{ alarm_minutes: number }>()
+  `).bind(tokenHash).first<{
+    alarm_minutes: number
+    include_meetings: number
+    include_ppa: number
+    include_competition: number
+    include_bonus: number
+  }>()
   if (!token) return apiError(context, 404, 'NOT_FOUND', '日历订阅不存在或已经失效')
+  const contentSelection: CalendarContentSelection = {
+    meetings: token.include_meetings === 1,
+    ppa: token.include_ppa === 1,
+    competition: token.include_competition === 1,
+    bonus: token.include_bonus === 1
+  }
+  const includeImportant = contentSelection.ppa || contentSelection.competition || contentSelection.bonus
   const [events, important] = await Promise.all([
-    listPublishedEvents(context.env),
-    listCalendarImportantItems(context.env)
+    contentSelection.meetings ? listPublishedEvents(context.env) : Promise.resolve([]),
+    includeImportant ? listCalendarImportantItems(context.env) : Promise.resolve({ items:[], dates:[] })
   ])
   const exceptions = await listEventExceptions(context.env, events.map((event) => event.id))
   const now = Temporal.Now.instant()
@@ -762,7 +806,9 @@ app.get('/ics/:token/calendar.ics', async (context) => {
   context.header('Content-Type', 'text/calendar; charset=utf-8')
   context.header('Content-Disposition', 'inline; filename="wq-calendar.ics"')
   context.header('Cache-Control', 'private, max-age=300')
-  return context.body(buildCalendarIcs(relevantEvents, relevantExceptions, token.alarm_minutes, important.items, important.dates))
+  return context.body(buildCalendarIcs(
+    relevantEvents, relevantExceptions, token.alarm_minutes, important.items, important.dates, contentSelection
+  ))
 })
 
 registerReplayRoutes(app)

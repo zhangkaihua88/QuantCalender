@@ -87,7 +87,7 @@ function entriesForDay(key: string): CalendarEntry[] {
   for (const item of filtered.value) {
     if (key >= item.startDate && key <= item.endDate) entries.push({ key:`${item.id}-range`, label:item.title, item, variant:'range' })
     if (item.kind === 'bonus' && item.announcementDate === key) entries.push({ key:`${item.id}-announcement`, label:`公布 · ${item.title}`, item, variant:'announcement' })
-    if (item.kind === 'bonus' && item.paymentDate === key) entries.push({ key:`${item.id}-payment`, label:`发放 · ${item.title}`, item, variant:'payment' })
+    if (item.kind === 'bonus' && item.paymentDate === key) entries.push({ key:`${item.id}-payment`, label:`账单 · ${item.title}`, item, variant:'payment' })
   }
   return entries
 }
@@ -167,7 +167,7 @@ async function submitItem(item: ImportantItemInput) {
         <MarkdownContent v-if="item.contentMarkdown" :content="item.contentMarkdown" />
         <div v-if="item.kind === 'bonus'" class="bonus-dates">
           <div><span>公布日期</span><strong>{{ item.announcementDate ? formatDate(item.announcementDate) : '待确定' }}</strong></div>
-          <div><span>发放日期</span><strong>{{ item.paymentDate ? formatDate(item.paymentDate) : '待确定' }}</strong></div>
+          <div><span>账单日期</span><strong>{{ item.paymentDate ? formatDate(item.paymentDate) : '待确定' }}</strong></div>
         </div>
       </article>
     </div>

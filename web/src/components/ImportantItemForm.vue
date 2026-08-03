@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type { ImportantItemInput, ImportantItemKind } from '@wq-calendar/shared'
+import CalendarDateInput from './CalendarDateInput.vue'
 import MarkdownContent from './MarkdownContent.vue'
 
 const props = withDefaults(defineProps<{
@@ -61,11 +62,11 @@ function submit() {
 
     <div class="form-grid">
       <div class="field wide"><label for="important-title">{{ isBonus ? '奖金名称' : '主题' }} *</label><input id="important-title" v-model="form.title" required minlength="2" maxlength="120" /></div>
-      <div class="field"><label for="important-start">{{ isBonus ? '周期开始' : '开始日期' }} *</label><input id="important-start" v-model="form.startDate" required type="date" /></div>
-      <div class="field"><label for="important-end">{{ isBonus ? '周期结束' : '结束日期' }} *</label><input id="important-end" v-model="form.endDate" required type="date" /></div>
+      <div class="field"><label for="important-start">{{ isBonus ? '周期开始' : '开始日期' }} *</label><CalendarDateInput id="important-start" v-model="form.startDate" required :aria-label="isBonus ? '周期开始' : '开始日期'" /></div>
+      <div class="field"><label for="important-end">{{ isBonus ? '周期结束' : '结束日期' }} *</label><CalendarDateInput id="important-end" v-model="form.endDate" required :aria-label="isBonus ? '周期结束' : '结束日期'" /></div>
       <template v-if="isBonus">
-        <div class="field"><label for="important-announcement">公布日期（可选）</label><input id="important-announcement" v-model="form.announcementDate" type="date" /></div>
-        <div class="field"><label for="important-payment">发放日期（可选）</label><input id="important-payment" v-model="form.paymentDate" type="date" /></div>
+        <div class="field"><label for="important-announcement">公布日期（可选）</label><CalendarDateInput id="important-announcement" v-model="form.announcementDate" aria-label="公布日期" /></div>
+        <div class="field"><label for="important-payment">账单日期（可选）</label><CalendarDateInput id="important-payment" v-model="form.paymentDate" aria-label="账单日期" /></div>
       </template>
     </div>
 

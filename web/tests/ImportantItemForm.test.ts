@@ -10,9 +10,32 @@ describe('ImportantItemForm', () => {
     expect(wrapper.text()).not.toContain('奖金日程')
   })
 
+  it('accepts direct eight-digit typing without expanding the year', async () => {
+    const wrapper = mount(ImportantItemForm)
+    const start = wrapper.find('#important-start')
+    await start.setValue('20260101')
+
+    expect(start.attributes('type')).toBe('text')
+    expect(start.attributes('maxlength')).toBe('10')
+    expect((start.element as HTMLInputElement).value).toBe('2026-01-01')
+  })
+
+  it('allows replacing only the year of an existing date', async () => {
+    const wrapper = mount(ImportantItemForm, { props:{ initial:{ startDate:'2025-01-01' } } })
+    const start = wrapper.find('#important-start')
+
+    await start.setValue('2-01-01')
+    await start.setValue('20-01-01')
+    await start.setValue('202-01-01')
+    await start.setValue('2026-01-01')
+
+    expect((start.element as HTMLInputElement).value).toBe('2026-01-01')
+  })
+
   it('shows bonus milestone fields to administrators and preserves markdown on submit', async () => {
     const wrapper = mount(ImportantItemForm, { props:{ allowBonus:true } })
     await wrapper.findAll('.item-kind-switch button')[2]!.trigger('click')
+    expect(wrapper.text()).toContain('账单日期（可选）')
     await wrapper.find('#important-title').setValue('季度薪酬')
     await wrapper.find('#important-start').setValue('2026-07-01')
     await wrapper.find('#important-end').setValue('2026-09-30')

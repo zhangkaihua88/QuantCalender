@@ -32,11 +32,21 @@ describe('buildCalendarIcs', () => {
     expect(output).not.toContain('BEGIN:VALARM')
     expect(output).not.toContain('TRIGGER:')
   })
+
+  it('omits meetings and their alarms when meeting sync is disabled', () => {
+    const output = buildCalendarIcs([event], [], 30, [], [], {
+      meetings:false, ppa:true, competition:true, bonus:true
+    })
+    expect(output).not.toContain('UID:stable@example')
+    expect(output).not.toContain('BEGIN:VALARM')
+  })
 })
 
 describe('calendar feed reminder validation', () => {
   it('accepts no reminder and rejects unsupported values', () => {
-    expect(calendarFeedSchema.parse({ alarmMinutes: 0 }).alarmMinutes).toBe(0)
+    const defaults = calendarFeedSchema.parse({ alarmMinutes: 0 })
+    expect(defaults.alarmMinutes).toBe(0)
+    expect(defaults.contentSelection).toEqual({ meetings:true, ppa:true, competition:true, bonus:true })
     expect(calendarFeedSchema.safeParse({ alarmMinutes: 5 }).success).toBe(false)
   })
 })
