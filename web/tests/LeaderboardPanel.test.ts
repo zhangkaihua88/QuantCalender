@@ -46,4 +46,19 @@ describe('LeaderboardPanel', () => {
     expect(wrapper.text()).toContain('贡献会议')
     expect(wrapper.text()).toContain('贡献 1 场会议')
   })
+
+  it('loads the important item contribution ranking as a third category', async () => {
+    const wrapper = mount(LeaderboardPanel, { global: { stubs: { RouterLink: { template:'<a><slot /></a>' } } } })
+    await flushPromises()
+    vi.mocked(api).mockResolvedValueOnce({
+      summary: { contributorCount:1, submissionCount:2, approvedCount:1, approvalRate:50 },
+      pagination: { page:1, pageSize:50, total:1, totalPages:1 },
+      entries: [{ rank:1, memberId:'member-1', wqId:'KZ', hasFullWqId:false, country:'CN', submissionCount:2, approvedCount:1, approvalRate:50, isCurrentUser:true }]
+    })
+    await wrapper.findAll('.leaderboard-switch button')[2]!.trigger('click')
+    await flushPromises()
+    expect(vi.mocked(api).mock.calls.at(-1)?.[0]).toContain('kind=important')
+    expect(wrapper.text()).toContain('重要事项投稿排行榜')
+    expect(wrapper.text()).toContain('通过事项')
+  })
 })

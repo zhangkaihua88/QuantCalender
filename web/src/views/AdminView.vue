@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CalendarDays, FileUp, Pencil, PlaySquare, Plus, ShieldX, XCircle } from 'lucide-vue-next'
+import { CalendarDays, FileUp, Flag, Pencil, PlaySquare, Plus, ShieldX, XCircle } from 'lucide-vue-next'
 import type { MeetingInput, MeetingOccurrence } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
 import { session } from '../state'
 import MeetingForm from '../components/MeetingForm.vue'
 import LeaderboardPanel from '../components/LeaderboardPanel.vue'
 import AdminReplayPanel from '../components/AdminReplayPanel.vue'
+import AdminImportantItemPanel from '../components/AdminImportantItemPanel.vue'
 
-type Tab = 'pending' | 'events' | 'replays' | 'members' | 'usage' | 'leaderboard' | 'audit'
+type Tab = 'pending' | 'events' | 'replays' | 'important' | 'members' | 'usage' | 'leaderboard' | 'audit'
 type UsageFilter = 'all' | 'logged' | 'not_logged' | 'subscribed' | 'not_subscribed' | 'active_session'
 type UsageMember = {
   id: string; wqId: string; hasFullWqId: boolean; country: 'CN' | 'HK'; active: boolean; recordDate: string
@@ -23,6 +24,7 @@ const router = useRouter()
 const tab = ref<Tab>('pending')
 const pending = ref<any[]>([])
 const pendingReplayCount = ref(0)
+const pendingImportantCount = ref(0)
 const events = ref<any[]>([])
 const occurrences = ref<MeetingOccurrence[]>([])
 const logs = ref<any[]>([])
@@ -220,7 +222,7 @@ async function revokeAllAdminSessions() {
   <div class="page-head"><div><p class="eyebrow">ADMIN CONSOLE</p><h1>日历管理</h1><p class="subtitle">审批成员投稿、维护会议系列和更新 CN/HK 成员名单。所有关键操作都会写入审计日志。</p></div><button class="button" @click="createEvent"><Plus :size="17" />新建会议</button></div>
   <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div><div v-if="notice" class="success-box" style="margin-bottom:14px">{{ notice }}</div>
 
-  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">待审 {{ pending.length + pendingReplayCount }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='replays'}" @click="tab='replays'">回放管理</button><button :class="{active:tab==='leaderboard'}" @click="tab='leaderboard'">投稿排行</button><button :class="{active:tab==='usage'}" @click="openUsage">使用统计</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
+  <div class="tabs"><button :class="{active:tab==='pending'}" @click="tab='pending'">待审 {{ pending.length + pendingReplayCount + pendingImportantCount }}</button><button :class="{active:tab==='events'}" @click="tab='events'">会议管理</button><button :class="{active:tab==='replays'}" @click="tab='replays'">回放管理</button><button :class="{active:tab==='important'}" @click="tab='important'">重要事项</button><button :class="{active:tab==='leaderboard'}" @click="tab='leaderboard'">投稿排行</button><button :class="{active:tab==='usage'}" @click="openUsage">使用统计</button><button :class="{active:tab==='members'}" @click="tab='members'">成员导入</button><button :class="{active:tab==='audit'}" @click="tab='audit'">审计日志</button></div>
 
   <section v-if="editorOpen" class="card card-body" style="margin-bottom:22px"><div class="section-title"><h2>{{ editing ? '编辑会议' : '创建会议' }}</h2><button class="icon-button" @click="editorOpen=false"><XCircle :size="19" /></button></div><div v-if="!editing || editing.status === 'draft'" class="field" style="max-width:280px;margin-bottom:16px"><label for="editor-status">保存状态</label><select id="editor-status" v-model="editorStatus"><option value="draft">保存为草稿</option><option value="published">立即发布</option></select></div><MeetingForm :initial="editing ? meetingFromEvent(editing) : undefined" :busy="busy" :submit-label="editing ? '保存修改' : editorStatus === 'draft' ? '保存草稿' : '发布会议'" @submit="saveEvent" /></section>
 
@@ -240,6 +242,10 @@ async function revokeAllAdminSessions() {
     <section class="pending-review-group pending-review-replays">
       <div class="pending-review-title"><span class="pending-review-icon"><PlaySquare :size="19" /></span><div><h2>回放投稿</h2><p>待审核 {{ pendingReplayCount }} 条</p></div></div>
       <AdminReplayPanel pending-only @pending-count="pendingReplayCount = $event" />
+    </section>
+    <section class="pending-review-group pending-review-important">
+      <div class="pending-review-title"><span class="pending-review-icon"><Flag :size="19" /></span><div><h2>重要事项投稿</h2><p>待审核 {{ pendingImportantCount }} 条</p></div></div>
+      <AdminImportantItemPanel pending-only @pending-count="pendingImportantCount = $event" />
     </section>
   </section>
 
@@ -286,6 +292,8 @@ async function revokeAllAdminSessions() {
   <section v-if="tab==='leaderboard'"><LeaderboardPanel /></section>
 
   <section v-if="tab==='replays'"><AdminReplayPanel /></section>
+
+  <section v-if="tab==='important'"><AdminImportantItemPanel @pending-count="pendingImportantCount = $event" /></section>
 
   <section v-if="tab==='audit'" class="card card-body"><table class="data-table"><thead><tr><th>时间</th><th>操作</th><th>对象</th><th>角色</th></tr></thead><tbody><tr v-for="item in logs" :key="item.id"><td>{{ new Date(item.created_at).toLocaleString('zh-CN') }}</td><td>{{ item.action }}</td><td>{{ item.entity_type }} · {{ item.entity_id.slice(0,8) }}</td><td>{{ item.actor_role }}</td></tr></tbody></table></section>
 </template>

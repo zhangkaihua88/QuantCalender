@@ -18,6 +18,8 @@ describe('LoginView', () => {
 
   it('asks for human verification without sending a login request', async () => {
     const wrapper = mount(LoginView)
+    expect(wrapper.text()).toContain('WQ Calendar')
+    expect(wrapper.find('button[type="submit"]').text()).toBe('进入 WQ 日历')
     await wrapper.find('#wq-id').setValue('KZ79256')
     await wrapper.find('form').trigger('submit')
     await flushPromises()

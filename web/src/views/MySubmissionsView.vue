@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { ReplaySubmission } from '@wq-calendar/shared'
+import type { ImportantItem, ReplaySubmission } from '@wq-calendar/shared'
 import { api, ApiError } from '../api'
 
-type Tab = 'meeting' | 'replay'
+type Tab = 'meeting' | 'replay' | 'important'
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number }
 const tab = ref<Tab>('meeting')
 const meetings = ref<any[]>([])
 const replays = ref<ReplaySubmission[]>([])
+const importantItems = ref<ImportantItem[]>([])
 const replayPagination = ref<Pagination>({ page:1, pageSize:20, total:0, totalPages:1 })
 const loading = ref(true)
 const error = ref('')
@@ -15,8 +16,13 @@ const label: Record<string,string> = { pending:'待审核', published:'已发布
 
 onMounted(async () => {
   try {
-    const [meetingData] = await Promise.all([api<{ submissions:any[] }>('/v1/submissions/mine'), loadReplays(1)])
+    const [meetingData, importantData] = await Promise.all([
+      api<{ submissions:any[] }>('/v1/submissions/mine'),
+      api<{ submissions:ImportantItem[] }>('/v1/important-item-submissions/mine'),
+      loadReplays(1)
+    ])
     meetings.value = meetingData.submissions
+    importantItems.value = importantData.submissions
   } catch (caught) { error.value = caught instanceof ApiError ? caught.message : '投稿记录加载失败' }
   finally { loading.value = false }
 })
@@ -33,17 +39,21 @@ async function loadReplays(page = replayPagination.value.page) {
 </script>
 
 <template>
-  <div class="page-head"><div><p class="eyebrow">MY SUBMISSIONS</p><h1>我的投稿</h1><p class="subtitle">查看当前 WQ_ID 提交的会议、回放来源和管理员反馈。</p></div><RouterLink class="button" :to="tab === 'meeting' ? '/?submit=1' : '/replays/submit'">{{ tab === 'meeting' ? '提交新会议' : '投稿新回放' }}</RouterLink></div>
-  <div class="segmented submission-switch"><button :class="{active:tab==='meeting'}" @click="tab='meeting'">会议投稿</button><button :class="{active:tab==='replay'}" @click="tab='replay'">回放投稿</button></div>
+  <div class="page-head"><div><p class="eyebrow">MY SUBMISSIONS</p><h1>我的投稿</h1><p class="subtitle">查看当前 WQ_ID 提交的会议、回放来源、重要事项和管理员反馈。</p></div><RouterLink class="button" :to="tab === 'meeting' ? '/?submit=1' : tab === 'replay' ? '/replays/submit' : '/important-items?submit=1'">{{ tab === 'meeting' ? '提交新会议' : tab === 'replay' ? '投稿新回放' : '投稿重要事项' }}</RouterLink></div>
+  <div class="segmented submission-switch"><button :class="{active:tab==='meeting'}" @click="tab='meeting'">会议投稿</button><button :class="{active:tab==='replay'}" @click="tab='replay'">回放投稿</button><button :class="{active:tab==='important'}" @click="tab='important'">重要事项投稿</button></div>
   <div v-if="error" class="error-box">{{ error }}</div>
   <div v-else-if="loading" class="empty-state">正在加载投稿记录…</div>
   <template v-else-if="tab==='meeting'">
     <div v-if="!meetings.length" class="empty-state">还没有提交过会议。</div>
     <div v-else class="agenda"><div v-for="item in meetings" :key="item.id" class="agenda-item"><div><span class="status" :class="item.status">{{ label[item.status] || item.status }}</span></div><div><h3>{{ item.title }}</h3><p>{{ item.summary }} · {{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</p><p v-if="item.reviewNote" class="review-note">管理员反馈：{{ item.reviewNote }}</p></div><RouterLink v-if="item.status === 'published'" class="button secondary small" :to="`/meetings/${item.id}`">查看</RouterLink></div></div>
   </template>
-  <template v-else>
+  <template v-else-if="tab==='replay'">
     <div v-if="!replays.length" class="empty-state">还没有提交过回放。</div>
     <div v-else class="agenda"><div v-for="item in replays" :key="item.id" class="agenda-item replay-submission-item"><div><span class="status" :class="item.status">{{ label[item.status] || item.status }}</span></div><div><h3>{{ item.title }}</h3><p>{{ item.meetingDate }} · {{ item.providerLabel }}</p><p v-if="item.note" class="muted">{{ item.note }}</p><p v-if="item.reviewNote" class="review-note">管理员反馈：{{ item.reviewNote }}</p></div><a v-if="item.status === 'published'" class="button secondary small" :href="item.shareUrl" target="_blank" rel="noopener noreferrer">打开</a></div></div>
     <div v-if="replays.length" class="pagination-bar"><span class="fine-print">第 {{ replayPagination.page }} / {{ replayPagination.totalPages }} 页，共 {{ replayPagination.total }} 条</span><div class="inline"><button class="button secondary small" :disabled="replayPagination.page<=1" @click="loadReplays(replayPagination.page-1)">上一页</button><button class="button secondary small" :disabled="replayPagination.page>=replayPagination.totalPages" @click="loadReplays(replayPagination.page+1)">下一页</button></div></div>
+  </template>
+  <template v-else>
+    <div v-if="!importantItems.length" class="empty-state">还没有提交过重要事项。</div>
+    <div v-else class="agenda"><div v-for="item in importantItems" :key="item.id" class="agenda-item"><div><span class="status" :class="item.status">{{ label[item.status] || item.status }}</span></div><div><h3>{{ item.title }}</h3><p>{{ item.kind === 'ppa' ? 'PPA 主题' : '比赛主题' }} · {{ item.startDate }}—{{ item.endDate }}</p><p v-if="item.reviewNote" class="review-note">管理员反馈：{{ item.reviewNote }}</p></div><RouterLink v-if="item.status === 'published'" class="button secondary small" to="/important-items">查看</RouterLink></div></div>
   </template>
 </template>

@@ -67,11 +67,11 @@ async function submit() {
     <section class="login-story">
       <div class="brand">
         <img class="brand-mark" src="/calendar-logo.png" alt="" width="44" height="44" />
-        <span><strong>Meeting Calendar</strong><small>非官方成员工具</small></span>
+        <span><strong>WQ Calendar</strong><small>非官方成员工具</small></span>
       </div>
       <div class="login-hero">
         <p class="eyebrow" style="color:#a7d9d3">BEIJING TIME · MEMBER ONLY</p>
-        <h1>不错过每一场<br />重要会议。</h1>
+        <h1>重要日程，<br />集中掌握。</h1>
       </div>
     </section>
     <section class="login-form-area">
@@ -88,7 +88,7 @@ async function submit() {
           <div v-if="mode === 'admin'" class="field"><label for="admin-password">管理员密码</label><input id="admin-password" v-model="password" required type="password" autocomplete="current-password" /></div>
           <div ref="widget" aria-label="人机验证"></div>
           <div v-if="error" class="error-box" role="alert">{{ error }}</div>
-          <button class="button" type="submit" :disabled="busy">{{ busy ? '正在验证…' : '进入会议日历' }}</button>
+          <button class="button" type="submit" :disabled="busy">{{ busy ? '正在验证…' : '进入 WQ 日历' }}</button>
         </form>
         <p class="fine-print" style="margin-top:18px">请勿在公共设备上保持登录。如遇成员资格问题，请联系日历管理员。</p>
       </div>

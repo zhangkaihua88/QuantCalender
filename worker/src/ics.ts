@@ -1,6 +1,7 @@
 import { Temporal } from '@js-temporal/polyfill'
 import type { Recurrence } from '@wq-calendar/shared'
 import type { EventRow, ExceptionRow } from './events'
+import type { ImportantItemCalendarDateRow, ImportantItemRow } from './important-items'
 
 const encoder = new TextEncoder()
 
@@ -17,6 +18,27 @@ function formatUtc(value: string): string {
 function formatLocal(value: string): string {
   const date = Temporal.PlainDateTime.from(value)
   return `${date.year.toString().padStart(4, '0')}${date.month.toString().padStart(2, '0')}${date.day.toString().padStart(2, '0')}T${date.hour.toString().padStart(2, '0')}${date.minute.toString().padStart(2, '0')}${date.second.toString().padStart(2, '0')}`
+}
+
+function formatDate(value: string): string {
+  return value.replaceAll('-', '')
+}
+
+function nextDate(value: string): string {
+  return Temporal.PlainDate.from(value).add({ days: 1 }).toString()
+}
+
+export function markdownToPlainText(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)(?:\s+["'][^"']*["'])?\)/g, '$1 ($2)')
+    .replace(/^#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*>[ \t]?/gm, '')
+    .replace(/^[ \t]*(?:[-+*]|\d+\.)[ \t]+/gm, '• ')
+    .replace(/(`+|\*\*|__|\*|_)/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function foldLine(line: string): string[] {
@@ -47,7 +69,7 @@ function recurrenceRule(event: EventRow): string | null {
 function alarmLines(minutes: number): string[] {
   if (minutes <= 0) return []
   const trigger = minutes === 1440 ? '-P1D' : `-PT${minutes}M`
-  return ['BEGIN:VALARM', `TRIGGER:${trigger}`, 'ACTION:DISPLAY', 'DESCRIPTION:WQ Meeting Calendar 会议提醒', 'END:VALARM']
+  return ['BEGIN:VALARM', `TRIGGER:${trigger}`, 'ACTION:DISPLAY', 'DESCRIPTION:WQ Calendar 会议提醒', 'END:VALARM']
 }
 
 function baseEventLines(event: EventRow, alarmMinutes: number): string[] {
@@ -100,20 +122,77 @@ function exceptionLines(event: EventRow, exception: ExceptionRow, alarmMinutes: 
   return lines
 }
 
-export function buildCalendarIcs(events: EventRow[], exceptions: ExceptionRow[], alarmMinutes = 30): string {
+const IMPORTANT_KIND_LABELS: Record<ImportantItemRow['kind'], string> = {
+  ppa: 'PPA 主题',
+  competition: '比赛主题',
+  bonus: '奖金日程'
+}
+
+function importantRangeLines(item: ImportantItemRow): string[] {
+  const description = markdownToPlainText(item.content_markdown)
+  return [
+    'BEGIN:VEVENT',
+    `UID:${item.uid}`,
+    `DTSTAMP:${formatUtc(new Date(item.updated_at).toISOString())}`,
+    `LAST-MODIFIED:${formatUtc(new Date(item.updated_at).toISOString())}`,
+    `SEQUENCE:${item.sequence}`,
+    `DTSTART;VALUE=DATE:${formatDate(item.start_date)}`,
+    `DTEND;VALUE=DATE:${formatDate(nextDate(item.end_date))}`,
+    `SUMMARY:${escapeText(`${IMPORTANT_KIND_LABELS[item.kind]} · ${item.title}`)}`,
+    `DESCRIPTION:${escapeText(description)}`,
+    `STATUS:${item.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`,
+    'TRANSP:TRANSPARENT',
+    'END:VEVENT'
+  ]
+}
+
+function importantMilestoneLines(item: ImportantItemRow, date: ImportantItemCalendarDateRow): string[] {
+  const label = date.date_kind === 'announcement' ? '奖金公布' : '奖金发放'
+  const cancelled = item.status === 'cancelled' || date.status === 'cancelled'
+  return [
+    'BEGIN:VEVENT',
+    `UID:${date.uid}`,
+    `DTSTAMP:${formatUtc(new Date(Math.max(item.updated_at, date.updated_at)).toISOString())}`,
+    `LAST-MODIFIED:${formatUtc(new Date(Math.max(item.updated_at, date.updated_at)).toISOString())}`,
+    `SEQUENCE:${item.sequence + date.sequence}`,
+    `DTSTART;VALUE=DATE:${formatDate(date.event_date)}`,
+    `DTEND;VALUE=DATE:${formatDate(nextDate(date.event_date))}`,
+    `SUMMARY:${escapeText(`${label} · ${item.title}`)}`,
+    `DESCRIPTION:${escapeText(markdownToPlainText(item.content_markdown))}`,
+    `STATUS:${cancelled ? 'CANCELLED' : 'CONFIRMED'}`,
+    'TRANSP:TRANSPARENT',
+    'END:VEVENT'
+  ]
+}
+
+export function buildCalendarIcs(
+  events: EventRow[],
+  exceptions: ExceptionRow[],
+  alarmMinutes = 30,
+  importantItems: ImportantItemRow[] = [],
+  importantDates: ImportantItemCalendarDateRow[] = []
+): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'PRODID:-//WQ Meeting Calendar//ZH-CN//EN',
-    'X-WR-CALNAME:WQ Meeting Calendar',
+    'PRODID:-//WQ Calendar//ZH-CN//EN',
+    'X-WR-CALNAME:WQ Calendar',
     'X-WR-TIMEZONE:Asia/Shanghai'
   ]
   for (const event of events) {
     lines.push(...baseEventLines(event, alarmMinutes))
     for (const exception of exceptions.filter((item) => item.event_id === event.id)) {
       lines.push(...exceptionLines(event, exception, alarmMinutes))
+    }
+  }
+  for (const item of importantItems) {
+    if (item.kind !== 'bonus') lines.push(...importantRangeLines(item))
+    if (item.kind === 'bonus') {
+      for (const date of importantDates.filter((entry) => entry.item_id === item.id)) {
+        lines.push(...importantMilestoneLines(item, date))
+      }
     }
   }
   lines.push('END:VCALENDAR')

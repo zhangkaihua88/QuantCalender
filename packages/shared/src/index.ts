@@ -22,7 +22,7 @@ const safeHttpsUrl = z.string().url().max(2048).refine((value) => {
   }
 }, '仅支持不包含账号密码的 HTTPS 链接')
 
-const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式必须为 YYYY-MM-DD').refine((value) => {
+export const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式必须为 YYYY-MM-DD').refine((value) => {
   const [year, month, day] = value.split('-').map(Number)
   const date = new Date(Date.UTC(year!, month! - 1, day!))
   return date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
@@ -126,6 +126,49 @@ export const identityPreferenceSchema = z.object({
   publicWqId: z.boolean()
 })
 
+export const importantItemKindSchema = z.enum(['ppa', 'competition', 'bonus'])
+export const importantItemStatusSchema = z.enum(['draft', 'pending', 'published', 'rejected', 'cancelled'])
+
+function markdownLinkIsSafe(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+  } catch {
+    return false
+  }
+}
+
+const markdownContentSchema = z.string().trim().max(8000).superRefine((value, context) => {
+  if (/!\[[^\]]*\]\([^)]*\)/.test(value)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: '重要事项内容不支持图片' })
+  }
+  for (const match of value.matchAll(/(?<!!)\[[^\]]*\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)/g)) {
+    if (!markdownLinkIsSafe(match[1]!)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Markdown 链接仅支持不包含账号密码的 HTTPS 地址' })
+    }
+  }
+})
+
+export const importantItemInputSchema = z.object({
+  kind: importantItemKindSchema,
+  title: z.string().trim().min(2).max(120),
+  contentMarkdown: markdownContentSchema.default(''),
+  startDate: calendarDateSchema,
+  endDate: calendarDateSchema,
+  announcementDate: calendarDateSchema.nullable().default(null),
+  paymentDate: calendarDateSchema.nullable().default(null)
+}).superRefine((value, context) => {
+  if (value.endDate < value.startDate) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: '结束日期不能早于开始日期' })
+  }
+  if (value.kind !== 'bonus' && !value.contentMarkdown) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['contentMarkdown'], message: '请填写事项内容' })
+  }
+  if (value.kind !== 'bonus' && (value.announcementDate || value.paymentDate)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['announcementDate'], message: '只有奖金日程可以设置公布和发放日期' })
+  }
+})
+
 export type MeetingInput = z.infer<typeof meetingInputSchema>
 export type EventStatus = z.infer<typeof eventStatusSchema>
 export type Recurrence = z.infer<typeof recurrenceSchema>
@@ -133,6 +176,27 @@ export type MemberImportRow = z.infer<typeof memberImportRowSchema>
 export type ReplayInput = z.infer<typeof replayInputSchema>
 export type ReplayStatus = z.infer<typeof replayStatusSchema>
 export type ReplayProvider = z.infer<typeof replayProviderSchema>
+export type ImportantItemKind = z.infer<typeof importantItemKindSchema>
+export type ImportantItemStatus = z.infer<typeof importantItemStatusSchema>
+export type ImportantItemInput = z.infer<typeof importantItemInputSchema>
+
+export interface ImportantItem {
+  id: string
+  uid: string
+  status: ImportantItemStatus
+  kind: ImportantItemKind
+  title: string
+  contentMarkdown: string
+  startDate: string
+  endDate: string
+  announcementDate: string | null
+  paymentDate: string | null
+  submittedByMember: boolean
+  sequence: number
+  reviewNote: string
+  createdAt: string
+  updatedAt: string
+}
 
 export interface MeetingOccurrence {
   eventId: string

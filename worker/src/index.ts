@@ -33,6 +33,7 @@ import { expandEvent, normalizeMeetingTimes, publicEvent, type EventRow } from '
 import { buildCalendarIcs } from './ics'
 import { visibleMemberIdentity } from './identity'
 import { publishedReplayOccurrenceKeys, registerReplayRoutes, replayOccurrenceIdentity } from './replays'
+import { listCalendarImportantItems, registerImportantItemRoutes } from './important-items'
 
 type Variables = { session: SessionRecord }
 const app = new Hono<{ Bindings: Env; Variables: Variables }>()
@@ -55,7 +56,7 @@ app.use('*', async (context, next) => {
   await next()
 })
 
-app.get('/health', (context) => context.json({ status: 'ok', service: 'wq-meeting-calendar-api', features: ['replays-v1'] }))
+app.get('/health', (context) => context.json({ status: 'ok', service: 'wq-meeting-calendar-api', features: ['replays-v1', 'important-items-v1'] }))
 
 function sessionUser(session: SessionRecord) {
   return {
@@ -271,7 +272,7 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
   }
   type LeaderboardSummary = { contributor_count: number; submission_count: number; approved_count: number; contributed_meeting_count?: number }
   const kind = context.req.query('kind') || 'meeting'
-  if (!['meeting', 'replay'].includes(kind)) return apiError(context, 422, 'INVALID_LEADERBOARD_KIND', '排行榜类型无效')
+  if (!['meeting', 'replay', 'important'].includes(kind)) return apiError(context, 422, 'INVALID_LEADERBOARD_KIND', '排行榜类型无效')
   const requestedPage = Number(context.req.query('page') || 1)
   const requestedPageSize = Number(context.req.query('pageSize') || 50)
   const pageSize = [25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
@@ -285,7 +286,16 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
         JOIN members m ON m.id = rl.submitter_member_id
         WHERE rl.submitter_member_id IS NOT NULL AND m.active = 1
       `).first<LeaderboardSummary>()
-    : await context.env.DB.prepare(`
+    : kind === 'important'
+      ? await context.env.DB.prepare(`
+        SELECT COUNT(DISTINCT ii.submitter_member_id) AS contributor_count,
+          COUNT(*) AS submission_count,
+          COALESCE(SUM(CASE WHEN ii.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+        FROM important_items ii
+        JOIN members m ON m.id = ii.submitter_member_id
+        WHERE ii.submitter_member_id IS NOT NULL AND m.active = 1
+      `).first<LeaderboardSummary>()
+      : await context.env.DB.prepare(`
         SELECT COUNT(DISTINCT e.submitter_member_id) AS contributor_count,
           COUNT(*) AS submission_count,
           COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
@@ -310,7 +320,19 @@ app.get('/v1/leaderboard', requireAuth(), async (context) => {
         ORDER BY contributed_meeting_count DESC, approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
         LIMIT ?1 OFFSET ?2
       `).bind(pageSize, offset).all<LeaderboardRow>()
-    : await context.env.DB.prepare(`
+    : kind === 'important'
+      ? await context.env.DB.prepare(`
+        SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
+          COUNT(ii.id) AS submission_count,
+          COALESCE(SUM(CASE WHEN ii.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
+        FROM important_items ii
+        JOIN members m ON m.id = ii.submitter_member_id
+        WHERE ii.submitter_member_id IS NOT NULL AND m.active = 1
+        GROUP BY m.id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country
+        ORDER BY approved_count DESC, submission_count DESC, m.wq_id_hint ASC, m.id ASC
+        LIMIT ?1 OFFSET ?2
+      `).bind(pageSize, offset).all<LeaderboardRow>()
+      : await context.env.DB.prepare(`
         SELECT m.id AS member_id, m.wq_id_hint, m.wq_id_ciphertext, m.public_wq_id, m.country,
           COUNT(e.id) AS submission_count,
           COALESCE(SUM(CASE WHEN e.published_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved_count
@@ -726,7 +748,10 @@ app.get('/ics/:token/calendar.ics', async (context) => {
     WHERE ct.token_hash = ?1 AND ct.revoked_at IS NULL AND m.active = 1
   `).bind(tokenHash).first<{ alarm_minutes: number }>()
   if (!token) return apiError(context, 404, 'NOT_FOUND', '日历订阅不存在或已经失效')
-  const events = await listPublishedEvents(context.env)
+  const [events, important] = await Promise.all([
+    listPublishedEvents(context.env),
+    listCalendarImportantItems(context.env)
+  ])
   const exceptions = await listEventExceptions(context.env, events.map((event) => event.id))
   const now = Temporal.Now.instant()
   const from = now.subtract({ hours: 90 * 24 }).toString()
@@ -735,12 +760,13 @@ app.get('/ics/:token/calendar.ics', async (context) => {
   const relevantIds = new Set(relevantEvents.map((event) => event.id))
   const relevantExceptions = exceptions.filter((item) => relevantIds.has(item.event_id))
   context.header('Content-Type', 'text/calendar; charset=utf-8')
-  context.header('Content-Disposition', 'inline; filename="wq-meeting-calendar.ics"')
+  context.header('Content-Disposition', 'inline; filename="wq-calendar.ics"')
   context.header('Cache-Control', 'private, max-age=300')
-  return context.body(buildCalendarIcs(relevantEvents, relevantExceptions, token.alarm_minutes))
+  return context.body(buildCalendarIcs(relevantEvents, relevantExceptions, token.alarm_minutes, important.items, important.dates))
 })
 
 registerReplayRoutes(app)
+registerImportantItemRoutes(app)
 
 app.get('/v1/admin/audit', requireAuth('admin'), async (context) => {
   const result = await context.env.DB.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 200').all()

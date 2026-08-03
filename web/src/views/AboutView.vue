@@ -1,40 +1,45 @@
 <template>
-  <div class="page-head"><div><p class="eyebrow">MEMBER GUIDE</p><h1>成员使用指南</h1><p class="subtitle">从查找和注册会议，到投稿回放、订阅提醒与管理身份显示，按照下面的顺序即可完成常用操作。</p></div></div>
+  <div class="page-head"><div><p class="eyebrow">WQ CALENDAR GUIDE</p><h1>成员使用指南</h1><p class="subtitle">WQ 日历集中提供会议日历、回放、重要事项和排行榜。下面按主导航顺序介绍常用操作。</p></div></div>
 
   <div class="guide-list">
     <section class="card card-body guide-step">
       <span class="guide-number">1</span>
-      <div class="detail-copy"><h2>查找并注册会议</h2><p>进入“会议”，可在议程和月历之间切换，并按关键词、类别、语言或会议形式筛选。点击“立即注册”会直接打开外部注册页面；点击“查看详情”可以先确认北京时间、会议状态和完整信息。</p></div>
+      <div class="detail-copy"><h2>使用会议日历</h2><p>进入“会议日历”，可在“即将开始”和“历史会议”之间切换，并使用议程或月历浏览。支持按关键词、类别、语言和会议形式筛选；页面中的会议时间统一显示为北京时间。</p><p>点击“立即注册”会直接打开外部注册页面；“查看详情”用于确认会议状态和完整信息。即将开始的周期会议在议程中只显示最近一场，历史会议则保留过去 180 天内的每个场次。历史场次只有存在已发布回放时才提供“查看回放”。</p><p>成员也可以点击“投稿会议”提交标题、类别、语言、注册链接、北京时间和持续时长，审核通过后才会公开。</p><RouterLink class="button" to="/?submit=1">打开会议日历</RouterLink></div>
     </section>
 
     <section class="card card-body guide-step">
       <span class="guide-number">2</span>
-      <div class="detail-copy"><h2>提交新会议</h2><p>在“会议”页面点击“投稿会议”，在弹出窗口中填写会议标题、类别、语言、注册链接、北京时间和持续时长。投稿会先进入审核队列，只有管理员通过后才会出现在会议列表中。</p><RouterLink class="button" to="/?submit=1">投稿会议</RouterLink></div>
+      <div class="detail-copy"><h2>浏览与贡献回放</h2><p>进入“回放”可以查看已经审核的会议回放来源，并按会议场次筛选。同一场会议允许多名成员补充不同的 HTTPS 网盘链接、提取码和简短备注。</p><p>遇到链接失效、提取码错误或内容不符时，可在来源卡片旁提交反馈；网站只保存链接信息，不保存视频文件，也不会主动访问网盘内容。</p><RouterLink class="button secondary" to="/replays">打开回放</RouterLink></div>
     </section>
 
     <section class="card card-body guide-step">
       <span class="guide-number">3</span>
-      <div class="detail-copy"><h2>查看审核结果</h2><p>在“我的投稿”中可以分别查看会议投稿和回放投稿，状态包括待审核、已发布、未通过或已下架。管理员留下的审核反馈也会显示在对应记录中。</p><RouterLink class="button secondary" to="/submissions">查看我的投稿</RouterLink></div>
+      <div class="detail-copy"><h2>查看与投稿重要事项</h2><p>“重要事项”通过时间线和月历集中展示 PPA 主题、比赛主题和奖金日程，历史记录及已取消事项仍会保留。日期均为北京时间下的全天日期，范围的结束日期包含当天。</p><p>成员可以使用基础 Markdown 投稿 PPA 或比赛内容；奖金周期、公布日期和发放日期仅由管理员维护。重要事项投稿同样需要审核通过后才会公开。</p><RouterLink class="button secondary" to="/important-items">打开重要事项</RouterLink></div>
     </section>
 
     <section class="card card-body guide-step">
       <span class="guide-number">4</span>
-      <div class="detail-copy"><h2>浏览与分享会议回放</h2><p>进入“回放”可以浏览已经审核的网盘来源。投稿时既可以关联已有会议场次，也可以手动填写历史会议；同一场会议允许多名成员补充不同链接。遇到链接失效、提取码错误或内容不符时，可在对应来源旁提交反馈。</p><RouterLink class="button secondary" to="/replays">浏览与投稿回放</RouterLink></div>
+      <div class="detail-copy"><h2>查看投稿审核结果</h2><p>“我的投稿”分别记录会议、回放和重要事项投稿。可以查看待审核、已发布、未通过、已取消或已下架等状态，以及管理员留下的审核反馈。</p><p>待审核内容不会进入公开页面；修改内容时需要重新提交，由管理员继续审核。</p><RouterLink class="button secondary" to="/submissions">查看我的投稿</RouterLink></div>
     </section>
 
     <section class="card card-body guide-step">
       <span class="guide-number">5</span>
-      <div class="detail-copy"><h2>设置提醒与身份显示</h2><p>进入“设置”，选择不提醒、提前 10 分钟、30 分钟、1 小时或 1 天，再生成个人订阅地址，并在 Google、Outlook 或 Apple Calendar 中通过 URL 添加订阅。</p><p>订阅地址相当于个人访问凭证，请勿转发。旋转或撤销后，旧地址会立即失效；实际刷新和提醒时间由所使用的日历客户端决定。</p><p>完整 WQ_ID 默认显示在排行榜和回放贡献者位置。关闭公开显示后，普通成员只能看到开头两个字母，不会看到后续数字；管理员仍可查看完整 ID。</p><RouterLink class="button secondary" to="/calendar-settings">打开成员设置</RouterLink></div>
+      <div class="detail-copy"><h2>查看排行榜与贡献者身份</h2><p>“排行榜”分别统计会议投稿、回放贡献和重要事项投稿，展示投稿数、通过数和通过率。管理员账号不参与成员排行。</p><p>完整 WQ_ID 默认显示在排行榜和回放来源卡片。可在“设置”中关闭公开显示；关闭后普通成员只能看到开头两个字母，管理员仍可查看完整 ID。</p><RouterLink class="button secondary" to="/leaderboard">打开排行榜</RouterLink></div>
+    </section>
+
+    <section class="card card-body guide-step">
+      <span class="guide-number">6</span>
+      <div class="detail-copy"><h2>订阅个人日历与设置提醒</h2><p>进入“设置”，选择不提醒、提前 10 分钟、30 分钟、1 小时或 1 天，再生成个人订阅地址，并在 Google、Outlook 或 Apple Calendar 中通过 URL 添加订阅。</p><p>同一个订阅会自动包含会议和重要事项，无需为新模块重新生成地址。会议使用所选提醒；重要事项不会写入提醒，但日历客户端仍可能应用用户自己的默认提醒。</p><p>订阅地址相当于个人访问凭证，请勿转发。生成新地址、旋转或撤销后，旧地址立即失效；实际刷新时间由日历客户端决定。</p><RouterLink class="button secondary" to="/calendar-settings">打开成员设置</RouterLink></div>
     </section>
 
     <section class="card card-body detail-copy guide-tips">
       <h2>使用提示</h2>
       <ul>
-        <li>网站中的会议时间统一显示为北京时间。</li>
         <li>单场会议可在详情页下载 .ics，也可直接添加到 Google Calendar。</li>
-        <li>周期会议在议程中只显示最近一场，可在月历中查看具体日期。</li>
-        <li>网站只保存回放链接和相关信息，不保存视频文件，也不会主动访问网盘内容。</li>
-        <li>请勿在会议或回放投稿中填写密码、个人专属链接或内部文件。</li>
+        <li>PPA 和比赛的完整日期范围会进入私人订阅；奖金周期只同步已填写的公布日期和发放日期。</li>
+        <li>重要事项的 Markdown 仅支持基础文字排版和绝对 HTTPS 链接，不支持图片、视频、表格或原始 HTML。</li>
+        <li>WQ_ID 登录仅作为导入成员名单的访问门禁，不代表官方身份认证。</li>
+        <li>请勿在会议、重要事项或回放投稿中填写密码、个人专属链接、内部文件或其他敏感内容。</li>
       </ul>
     </section>
   </div>

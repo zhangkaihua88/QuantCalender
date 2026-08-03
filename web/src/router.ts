@@ -10,6 +10,7 @@ import AboutView from './views/AboutView.vue'
 import LeaderboardView from './views/LeaderboardView.vue'
 import ReplaysView from './views/ReplaysView.vue'
 import ReplaySubmitView from './views/ReplaySubmitView.vue'
+import ImportantItemsView from './views/ImportantItemsView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/', component: CalendarView },
     { path: '/meetings/:id', component: MeetingDetailView },
     { path: '/replays', component: ReplaysView },
+    { path: '/important-items', component: ImportantItemsView },
     { path: '/replays/submit', component: ReplaySubmitView, meta: { member: true } },
     { path: '/submit', redirect: { path: '/', query: { submit: '1' } } },
     { path: '/submissions', component: MySubmissionsView, meta: { member: true } },
