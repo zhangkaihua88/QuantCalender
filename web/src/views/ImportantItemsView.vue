@@ -54,18 +54,32 @@ function dateRange(item: ImportantItem) { return item.startDate === item.endDate
 function statusLabel(item: ImportantItem) {
   if (item.status === 'cancelled') return '已取消'
   const today = beijingToday()
+  if (item.kind === 'bonus') {
+    const dates = [item.announcementDate, item.paymentDate].filter((date): date is string => Boolean(date))
+    if (!dates.length) return '日期待定'
+    if (dates.includes(today)) return '进行中'
+    if (dates.some((date) => date > today)) return '即将到来'
+    return '已结束'
+  }
   if (item.startDate <= today && item.endDate >= today) return '进行中'
-  if (item.startDate > today || [item.announcementDate, item.paymentDate].some((date) => date && date >= today)) return '即将开始'
+  if (item.startDate > today) return '即将开始'
   return '已结束'
 }
 
 function sortKey(item: ImportantItem) {
   const today = beijingToday()
+  if (item.kind === 'bonus') {
+    const dates = [item.announcementDate, item.paymentDate].filter((date): date is string => Boolean(date)).sort()
+    if (dates.includes(today)) return { tier: 0, value: today }
+    const futureDates = dates.filter((date) => date > today)
+    if (futureDates.length) return { tier: 1, value: futureDates[0]! }
+    if (dates.length) return { tier: 2, value: dates.at(-1)! }
+    return { tier: 3, value: item.updatedAt }
+  }
   if (item.startDate <= today && item.endDate >= today) return { tier: 0, value: item.endDate }
-  const futureDates = [item.startDate, item.announcementDate, item.paymentDate].filter((date): date is string => Boolean(date && date >= today)).sort()
+  const futureDates = [item.startDate].filter((date) => date >= today).sort()
   if (futureDates.length) return { tier: 1, value: futureDates[0]! }
-  const pastDates = [item.endDate, item.announcementDate, item.paymentDate].filter((date): date is string => Boolean(date)).sort().reverse()
-  return { tier: 2, value: pastDates[0] || item.endDate }
+  return { tier: 2, value: item.endDate }
 }
 
 const filtered = computed(() => items.value.filter((item) => {
@@ -85,7 +99,7 @@ function dayKey(date: Date) { return `${date.getUTCFullYear()}-${String(date.get
 function entriesForDay(key: string): CalendarEntry[] {
   const entries: CalendarEntry[] = []
   for (const item of filtered.value) {
-    if (key >= item.startDate && key <= item.endDate) entries.push({ key:`${item.id}-range`, label:item.title, item, variant:'range' })
+    if (item.kind !== 'bonus' && key >= item.startDate && key <= item.endDate) entries.push({ key:`${item.id}-range`, label:item.title, item, variant:'range' })
     if (item.kind === 'bonus' && item.announcementDate === key) entries.push({ key:`${item.id}-announcement`, label:`公布 · ${item.title}`, item, variant:'announcement' })
     if (item.kind === 'bonus' && item.paymentDate === key) entries.push({ key:`${item.id}-payment`, label:`账单 · ${item.title}`, item, variant:'payment' })
   }

@@ -90,7 +90,7 @@ async function cancelItem(item: ImportantItem) {
 
 <template>
   <div :class="{ 'admin-important-pending-embed':pendingOnly }">
-    <div v-if="!pendingOnly" class="section-title replay-admin-head"><div><h2>重要事项管理</h2><p class="fine-print">维护 PPA、比赛和奖金周期；已发布日期修改后会同步到现有订阅。</p></div><div class="inline"><button class="button secondary small" type="button" @click="load"><RefreshCw :size="15" />刷新</button><button class="button small" type="button" @click="createItem"><Plus :size="15" />直接新增</button></div></div>
+    <div v-if="!pendingOnly" class="section-title replay-admin-head"><div><h2>重要事项管理</h2><p class="fine-print">维护 PPA、比赛、奖金适用周期和关键日期；已发布日期修改后会同步到现有订阅。</p></div><div class="inline"><button class="button secondary small" type="button" @click="load"><RefreshCw :size="15" />刷新</button><button class="button small" type="button" @click="createItem"><Plus :size="15" />直接新增</button></div></div>
     <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div><div v-if="notice" class="success-box" style="margin-bottom:14px">{{ notice }}</div>
 
     <section v-if="editorOpen" class="card card-body important-admin-editor">
@@ -103,7 +103,7 @@ async function cancelItem(item: ImportantItem) {
     <div v-else-if="!visibleItems.length" class="empty-state">{{ pendingOnly ? '当前没有待审核的重要事项投稿。' : '还没有重要事项记录。' }}</div>
     <div v-else class="stack">
       <article v-for="item in visibleItems" :key="item.id" class="card card-body important-admin-card">
-        <div class="page-head important-admin-head"><div><div class="inline"><span class="tag">{{ KIND_LABELS[item.kind] }}</span><span class="status" :class="item.status">{{ STATUS_LABELS[item.status] }}</span></div><h3>{{ item.title }}</h3><p class="muted">{{ item.startDate }}—{{ item.endDate }}</p></div><button v-if="['draft','pending','published'].includes(item.status)" class="button secondary small" type="button" @click="editItem(item)"><Pencil :size="15" />编辑</button></div>
+        <div class="page-head important-admin-head"><div><div class="inline"><span class="tag">{{ KIND_LABELS[item.kind] }}</span><span class="status" :class="item.status">{{ STATUS_LABELS[item.status] }}</span></div><h3>{{ item.title }}</h3><p class="muted">{{ item.kind === 'bonus' ? '适用周期：' : '' }}{{ item.startDate }}—{{ item.endDate }}</p></div><button v-if="['draft','pending','published'].includes(item.status)" class="button secondary small" type="button" @click="editItem(item)"><Pencil :size="15" />编辑</button></div>
         <MarkdownContent v-if="item.contentMarkdown" :content="item.contentMarkdown" />
         <div v-if="item.kind === 'bonus'" class="bonus-dates"><div><span>公布日期</span><strong>{{ item.announcementDate || '待确定' }}</strong></div><div><span>账单日期</span><strong>{{ item.paymentDate || '待确定' }}</strong></div></div>
         <template v-if="item.status === 'pending'">

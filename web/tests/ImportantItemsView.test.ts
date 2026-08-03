@@ -27,6 +27,8 @@ describe('ImportantItemsView', () => {
     expect(wrapper.text()).toContain('季度薪酬')
     expect(wrapper.text()).toContain('已取消')
     expect(wrapper.text()).not.toContain('历史事项')
+    expect(wrapper.text()).toContain('适用周期')
+    expect(wrapper.text()).toContain('2026年7月1日—2026年9月30日')
   })
 
   it('places a multi-day topic on every covered calendar date', async () => {
@@ -34,10 +36,12 @@ describe('ImportantItemsView', () => {
     await flushPromises()
     await wrapper.findAll('.calendar-page-actions .segmented button')[1]!.trigger('click')
     expect(wrapper.findAll('.important-chip').filter((chip) => chip.text() === '夏季 PPA')).toHaveLength(3)
+    expect(wrapper.findAll('.important-chip').filter((chip) => chip.text().includes('季度薪酬'))).toHaveLength(0)
     const nextMonth = wrapper.find('[aria-label="下一个月"]')
     await nextMonth.trigger('click')
     await nextMonth.trigger('click')
     await nextMonth.trigger('click')
     expect(wrapper.text()).toContain('公布 · 季度薪酬')
+    expect(wrapper.findAll('.important-chip').filter((chip) => chip.text() === '公布 · 季度薪酬')).toHaveLength(1)
   })
 })

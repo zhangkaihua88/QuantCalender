@@ -14,7 +14,7 @@
 
     <section class="card card-body guide-step">
       <span class="guide-number">3</span>
-      <div class="detail-copy"><h2>查看与投稿重要事项</h2><p>“重要事项”通过时间线和月历集中展示 PPA 主题、比赛主题和奖金日程，历史记录及已取消事项仍会保留。日期均为北京时间下的全天日期，范围的结束日期包含当天。</p><p>成员可以使用基础 Markdown 投稿 PPA 或比赛内容；奖金周期、公布日期和账单日期仅由管理员维护。重要事项投稿同样需要审核通过后才会公开。</p><RouterLink class="button secondary" to="/important-items">打开重要事项</RouterLink></div>
+      <div class="detail-copy"><h2>查看与投稿重要事项</h2><p>“重要事项”通过时间线和月历集中展示 PPA 主题、比赛主题和奖金日程，历史记录及已取消事项仍会保留。日期均为北京时间下的全天日期，范围的结束日期包含当天。</p><p>成员可以使用基础 Markdown 投稿 PPA 或比赛内容；奖金卡片显示适用周期，但月历只在公布日期和账单日期显示，由管理员维护。重要事项投稿同样需要审核通过后才会公开。</p><RouterLink class="button secondary" to="/important-items">打开重要事项</RouterLink></div>
     </section>
 
     <section class="card card-body guide-step">
@@ -36,7 +36,7 @@
       <h2>使用提示</h2>
       <ul>
         <li>单场会议可在详情页下载 .ics，也可直接添加到 Google Calendar。</li>
-        <li>PPA 和比赛的完整日期范围会进入私人订阅；奖金周期只同步已填写的公布日期和账单日期。</li>
+        <li>PPA 和比赛的完整日期范围会进入私人订阅；奖金只同步已填写的公布日期和账单日期。</li>
         <li>重要事项的 Markdown 仅支持基础文字排版和绝对 HTTPS 链接，不支持图片、视频、表格或原始 HTML。</li>
         <li>WQ_ID 登录仅作为导入成员名单的访问门禁，不代表官方身份认证。</li>
         <li>请勿在会议、重要事项或回放投稿中填写密码、个人专属链接、内部文件或其他敏感内容。</li>
